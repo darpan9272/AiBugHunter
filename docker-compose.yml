@@ -1,0 +1,99 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bughunting_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bughunting
+      POSTGRES_USER: bugbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_prod}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+
+  redis:
+    image: redis:7-alpine
+    container_name: bughunting_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: bughunting_chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_AUTH_CREDENTIALS=${CHROMA_AUTH_TOKEN:-changeme_chroma}
+      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=chromadb.auth.token.TokenConfigServerAuthCredentialsProvider
+      - CHROMA_SERVER_AUTH_PROVIDER=chromadb.auth.token.TokenAuthServerProvider
+
+  recon-mcp:
+    build:
+      context: ./mcp-servers/recon-mcp
+      dockerfile: Dockerfile
+    container_name: bughunting_recon_mcp
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "8001:8001"
+    environment:
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - CENSYS_API_ID=${CENSYS_API_ID}
+      - CENSYS_API_SECRET=${CENSYS_API_SECRET}
+      - RATE_LIMIT_RPS=${RATE_LIMIT_RPS:-5}
+    volumes:
+      - ./targets:/app/targets:ro
+      - recon_output:/app/output
+
+  exploit-mcp:
+    build:
+      context: ./mcp-servers/exploit-mcp
+      dockerfile: Dockerfile
+    container_name: bughunting_exploit_mcp
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "8002:8002"
+    environment:
+      - INTERACTSH_SERVER=${INTERACTSH_SERVER:-oast.pro}
+      - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
+      - NUCLEI_TEMPLATES_PATH=/app/nuclei-templates
+    volumes:
+      - ./targets:/app/targets:ro
+      - nuclei_output:/app/output
+      - nuclei_templates:/app/nuclei-templates
+
+  report-mcp:
+    build:
+      context: ./mcp-servers/report-mcp
+      dockerfile: Dockerfile
+    container_name: bughunting_report_mcp
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "8003:8003"
+    environment:
+      - NVD_API_KEY=${NVD_API_KEY}
+    volumes:
+      - ./reports:/app/reports
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
+  recon_output:
+  nuclei_output:
+  nuclei_templates:

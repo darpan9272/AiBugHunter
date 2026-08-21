@@ -1,0 +1,33 @@
+{
+    "triage_weights": {
+        "static": 0.3,
+        "embedding": 0.4,
+        "llm": 0.3
+    },
+    "exploit_priority": [
+        "sqli",
+        "idor",
+        "xss",
+        "ssrf",
+        "auth_bypass",
+        "rce",
+        "api",
+        "lfi"
+    ],
+    "target_type_hints": {
+        "django": ["sqli", "idor"],
+        "rails": ["sqli", "idor"],
+        "php": ["sqli", "xss", "lfi"],
+        "wordpress": ["sqli", "xss"],
+        "graphql": ["api", "idor"],
+        "react": ["xss", "idor"],
+        "java": ["ssrf", "rce"]
+    },
+    "payload_boost_patterns": [],
+    "fp_suppression_threshold": 0.85,
+    "min_triage_score": 0.35,
+    "_meta": {
+        "version": 1,
+        "note": "Initial default strategy — no learning data yet. Meta-Agent will update this weekly."
+    }
+}

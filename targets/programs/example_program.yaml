@@ -1,0 +1,43 @@
+# Example Programme Configuration
+# Copy this to targets/programs/<your_programme_name>.yaml
+
+name: example_program
+platform: hackerone           # hackerone | bugcrowd | private
+rate_limit_rps: 5             # requests per second across all tools
+
+# In-scope patterns (Python regex — all targets must match at least one)
+in_scope:
+  - ".*\\.example\\.com$"
+  - "^example\\.com$"
+  - "^api\\.example\\.com$"
+  - "^staging\\.example\\.com$"
+
+# Out-of-scope patterns (any match = rejected immediately)
+out_of_scope:
+  - ".*\\.example\\.com/admin/billing.*"  # billing system explicitly OOS
+  - ".*third-party-vendor\\.com.*"
+
+# Vuln types the programme pays for (agents prioritise these)
+in_scope_vuln_types:
+  - sqli
+  - xss
+  - idor
+  - ssrf
+  - rce
+  - auth_bypass
+
+# Explicitly out-of-scope vuln types
+out_of_scope_vuln_types:
+  - social_engineering
+  - physical
+  - dos_ddos
+
+# Severity minimums (don't report below this)
+min_severity: medium
+
+# Programme-specific notes for agents
+notes: |
+  - The /api/v2/ endpoint is newer and less tested — prioritise it
+  - The app uses React on the frontend and Django on the backend
+  - Admin panel is at /dashboard/ — look for IDOR between user accounts
+  - Rate limiting is enforced at 100 req/min per IP
