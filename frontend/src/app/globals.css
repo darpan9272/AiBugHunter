@@ -266,3 +266,46 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ─────────────────────────── Responsive helpers ─────────────────────────── */
+
+@layer components {
+  /* Data tables scroll edge-to-edge on small screens */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .table-wrap > table {
+    min-width: 720px;
+  }
+
+  /* Bottom-sheet style modal on mobile, centered dialog on desktop */
+  .modal-panel {
+    width: 100%;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Safe-area padding for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Prevent iOS input zoom (inputs under 16px trigger auto-zoom) */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+

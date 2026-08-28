@@ -232,7 +232,7 @@ export default function ASMDashboard() {
       )}
 
       {programmeId && loading && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="p-6 animate-pulse">
               <div className="h-4 bg-surface-2 rounded w-3/4 mb-2" />
@@ -245,7 +245,7 @@ export default function ASMDashboard() {
       {programmeId && !loading && riskStats && (
         <>
           {/* Risk Score Distribution */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
             <Card className={`p-4 ${getTierColor("critical")} border`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -525,8 +525,8 @@ export default function ASMDashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <Link href="/asm/graph" className="Card p-4 hover:border-accent/50 transition-colors group">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Link href="/asm/graph" className="card p-4 hover:border-accent/50 transition-colors group block">
               <div className="flex items-center gap-3">
                 <Network className="h-6 w-6 text-accent group-hover:scale-110 transition-transform" />
                 <div>
@@ -535,7 +535,7 @@ export default function ASMDashboard() {
                 </div>
               </div>
             </Link>
-            <Link href="/asm/timeline" className="Card p-4 hover:border-accent/50 transition-colors group">
+            <Link href="/asm/timeline" className="card p-4 hover:border-accent/50 transition-colors group block">
               <div className="flex items-center gap-3">
                 <Clock className="h-6 w-6 text-accent group-hover:scale-110 transition-transform" />
                 <div>
@@ -544,7 +544,7 @@ export default function ASMDashboard() {
                 </div>
               </div>
             </Link>
-            <Link href="/asm/watch" className="Card p-4 hover:border-accent/50 transition-colors group">
+            <Link href="/asm/watch" className="card p-4 hover:border-accent/50 transition-colors group block">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-6 w-6 text-accent group-hover:scale-110 transition-transform" />
                 <div>
@@ -553,7 +553,7 @@ export default function ASMDashboard() {
                 </div>
               </div>
             </Link>
-            <Link href="/asm/enrichment" className="Card p-4 hover:border-accent/50 transition-colors group">
+            <Link href="/asm/enrichment" className="card p-4 hover:border-accent/50 transition-colors group block">
               <div className="flex items-center gap-3">
                 <RefreshCw className="h-6 w-6 text-accent group-hover:scale-110 transition-transform" />
                 <div>

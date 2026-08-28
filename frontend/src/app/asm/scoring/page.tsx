@@ -186,7 +186,7 @@ export default function ASMScoringPage() {
       )}
 
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {["critical", "high", "medium", "low", "info"].map((tier) => {
           const count = filteredAssets.filter((a) => a.tier === tier).length;
           const TierIcon = TIER_ICONS[tier];
@@ -248,7 +248,7 @@ export default function ASMScoringPage() {
 
       {/* Assets Table */}
       <Card>
-        <div className="overflow-x-auto">
+        <div className="table-wrap">
           <table className="w-full">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground uppercase tracking-wider">
@@ -351,7 +351,7 @@ export default function ASMScoringPage() {
         <h4 className="font-medium mb-3 flex items-center gap-2">
           <BarChart3 className="h-5 w-5" /> Scoring Methodology
         </h4>
-        <div className="grid gap-4 md:grid-cols-3 text-sm">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
           <div className="p-3 rounded border border-red-500/20 bg-red-500/5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-3 h-3 rounded-full bg-red-500" />
@@ -383,7 +383,7 @@ export default function ASMScoringPage() {
       {/* Asset Detail Modal */}
       {showDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto">
+          <Card className="modal-panel max-w-4xl">
             <div className="p-4 border-b flex items-center justify-between">
               <div>
                 <p className="font-mono text-lg">{showDetails.host}</p>

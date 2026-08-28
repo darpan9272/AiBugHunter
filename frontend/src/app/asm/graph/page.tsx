@@ -200,7 +200,7 @@ export default function ASMGraphPage() {
   };
 
   return (
-    <div className="space-y-5 h-[calc(100vh-200px)] min-h-[700px]">
+    <div className="space-y-5 h-[calc(100vh-200px)] min-h-[480px] sm:min-h-[700px]">
       <PageHeader
         title="Pivot Graph"
         description="Interactive attack surface visualization — explore relationships between assets, certificates, DNS, and infrastructure."
@@ -240,7 +240,7 @@ export default function ASMGraphPage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-4">
           {/* Seed Input */}
-          <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+          <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-[300px]">
             <label className="text-xs text-muted-foreground whitespace-nowrap">Seed:</label>
             <Input
               value={seed}
@@ -298,7 +298,7 @@ export default function ASMGraphPage() {
           </div>
 
           {/* Relationship Types */}
-          <div className="flex flex-wrap items-center gap-2 border-l border-border pl-4 ml-auto">
+          <div className="flex flex-wrap items-center gap-2 lg:border-l lg:border-border lg:pl-4 lg:ml-auto">
             <span className="text-xs text-muted-foreground">Relationships:</span>
             {[
               { key: "subdomain", label: "Subdomain" },
@@ -473,7 +473,7 @@ export default function ASMGraphPage() {
 
       {/* Node Detail Panel */}
       {selectedNode && (
-        <Card className="fixed bottom-4 right-4 w-80 max-h-96 overflow-auto z-10 shadow-xl border-accent/30">
+        <Card className="fixed inset-x-4 bottom-4 sm:left-auto sm:right-4 sm:w-80 max-h-[45vh] sm:max-h-96 overflow-auto z-10 shadow-xl border-accent/30">
           <div className="flex items-center justify-between p-3 border-b">
             <div className="flex items-center gap-2">
               <span style={{ color: KIND_COLORS[selectedNode.kind] }} className="text-xl">{KIND_ICONS[selectedNode.kind] || "•"}</span>

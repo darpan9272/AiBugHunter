@@ -376,8 +376,8 @@ export default function ASMWatchPage() {
 
       {/* Create Rule Modal */}
       {showCreateRule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="modal-panel max-w-2xl">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">Create Watch Rule</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowCreateRule(false)}>
@@ -440,8 +440,8 @@ export default function ASMWatchPage() {
 
       {/* Create Channel Modal */}
       {showCreateChannel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="modal-panel max-w-2xl">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">Create Alert Channel</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowCreateChannel(false)}>
@@ -520,8 +520,8 @@ export default function ASMWatchPage() {
 
       {/* Edit Rule Modal */}
       {editingRule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="modal-panel max-w-2xl">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">Edit Watch Rule</h3>
               <Button variant="ghost" size="icon" onClick={() => setEditingRule(null)}>

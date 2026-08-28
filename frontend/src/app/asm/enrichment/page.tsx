@@ -315,7 +315,7 @@ export default function ASMEnrichmentPage() {
                     {/* Expandable details */}
                     {selectedJob?.id === job.id && (
                       <div className="mt-4 pt-4 border-t space-y-3">
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           <div>
                             <p className="text-xs text-muted-foreground">Job ID</p>
                             <p className="font-mono text-sm">{job.id}</p>
@@ -383,8 +383,8 @@ export default function ASMEnrichmentPage() {
 
       {/* Create Job Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="modal-panel max-w-2xl">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">New Enrichment Job</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowCreate(false)}>

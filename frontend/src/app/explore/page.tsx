@@ -162,17 +162,17 @@ export default function ExplorePage() {
         <button
           onClick={() => runSearch()}
           disabled={loading}
-          className="flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-xl bg-accent px-4 sm:px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 shrink-0"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          Search
+          <span className="hidden sm:inline">Search</span>
         </button>
         <button
           onClick={watchQuery}
           title="Alert me when new assets match this query"
-          className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm text-foreground hover:bg-surface-2"
+          className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm text-foreground hover:bg-surface-2 shrink-0"
         >
-          <Bell className="h-4 w-4" /> Watch
+          <Bell className="h-4 w-4" /> <span className="hidden sm:inline">Watch</span>
         </button>
       </div>
 

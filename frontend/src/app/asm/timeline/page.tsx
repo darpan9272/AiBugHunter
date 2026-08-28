@@ -182,7 +182,7 @@ export default function ASMTimelinePage() {
   };
 
   return (
-    <div className="space-y-5 h-[calc(100vh-200px)] min-h-[700px]">
+    <div className="space-y-5 h-[calc(100vh-200px)] min-h-[480px] sm:min-h-[700px]">
       <PageHeader
         title="Asset Timeline"
         description="Track historical changes to your attack surface assets — field-level diffs with source attribution."
@@ -216,7 +216,7 @@ export default function ASMTimelinePage() {
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-4">
           {/* Host Search */}
-          <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+          <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-[300px]">
             <label className="text-xs text-muted-foreground whitespace-nowrap">Asset:</label>
             <Input
               value={host}
@@ -360,7 +360,7 @@ export default function ASMTimelinePage() {
                   <div key={`${change.id}-${idx}`} className="p-4 hover:bg-surface-1/50 transition-colors">
                     <div className="flex flex-wrap items-start gap-4">
                       {/* Timestamp & Type */}
-                      <div className="flex flex-col items-start gap-1 min-w-[140px]">
+                      <div className="flex flex-col items-start gap-1 sm:min-w-[140px] w-full sm:w-auto">
                         <span className="font-mono text-xs text-muted-foreground">
                           {new Date(change.created_at).toLocaleString()}
                         </span>
@@ -373,7 +373,7 @@ export default function ASMTimelinePage() {
                       </div>
 
                       {/* Field Name */}
-                      <div className="flex-1 min-w-[150px]">
+                      <div className="flex-1 min-w-0">
                         <span className="font-mono text-sm font-medium text-accent">{change.field_name}</span>
                         {change.meta && Object.keys(change.meta).length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -383,7 +383,7 @@ export default function ASMTimelinePage() {
                       </div>
 
                       {/* Old Value */}
-                      <div className="flex-1 min-w-[200px]">
+                      <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground mb-1">Old Value</p>
                         <div className="bg-red-500/10 border border-red-500/20 rounded p-2 max-h-40 overflow-auto">
                           {change.old_value !== null && change.old_value !== undefined ? (
@@ -395,7 +395,7 @@ export default function ASMTimelinePage() {
                       </div>
 
                       {/* New Value */}
-                      <div className="flex-1 min-w-[200px]">
+                      <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground mb-1">New Value</p>
                         <div className="bg-green-500/10 border border-green-500/20 rounded p-2 max-h-40 overflow-auto">
                           {change.new_value !== null && change.new_value !== undefined ? (

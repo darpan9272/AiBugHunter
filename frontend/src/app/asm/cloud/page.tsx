@@ -196,7 +196,7 @@ export default function ASMCloudPage() {
 
       {/* Summary Cards */}
       {summary.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           {summary.map((s) => (
             <Card key={s.provider} className="p-4">
               <div className="flex items-center justify-between mb-2">
@@ -272,7 +272,7 @@ export default function ASMCloudPage() {
 
       {/* Assets Table */}
       <Card>
-        <div className="overflow-x-auto">
+        <div className="table-wrap">
           <table className="w-full">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground uppercase tracking-wider">
@@ -362,7 +362,7 @@ export default function ASMCloudPage() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="p-4 border-border/50 hover:border-accent/50 transition-colors">
           <h4 className="font-medium mb-2 flex items-center gap-2">
             <Zap className="h-5 w-5" /> Trigger Cloud Discovery
