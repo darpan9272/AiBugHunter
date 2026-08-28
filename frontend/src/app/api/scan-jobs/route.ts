@@ -43,7 +43,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { programmeId, scanProfileId, agentIds } = body;
+    // Accept both camelCase and snake_case for robustness across clients
+    const programmeId = body.programmeId || body.programme_id;
+    const scanProfileId = body.scanProfileId || body.scan_profile_id;
+    const agentIds = body.agentIds || body.agent_ids;
 
     // Validate required fields
     if (!programmeId) {

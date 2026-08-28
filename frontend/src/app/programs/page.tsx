@@ -149,7 +149,7 @@ export default function ProgramsPage() {
 
   async function handleLaunchScan(programmeId: string) {
     try {
-      const res = await apiService.scanJobs.create({ programme_id: programmeId });
+      const res = await apiService.scanJobs.create({ programmeId });
       if (res.error) {
         alert(res.error || "Failed to launch scan");
         return;
