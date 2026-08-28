@@ -1,0 +1,28 @@
+name: "External Network Perimeter Scan"
+description: "External network discovery and vulnerability assessment"
+type: "network"
+recon:
+  - nmap (for discovery)
+  - masscan
+  - zonetransfer
+  - dnsrecon
+  - shodan
+  - censys
+  - httpx (for web services)
+triage:
+  - service-version-detection
+  - cve-check
+  - default-credential-check
+  - anonymous-access-check
+  - ssl-tls-analyzer
+exploit:
+  - nmap-vuln-scripts
+  - nikto
+  - metasploit-framework (selective)
+  - smbclient-check
+  - rdp-check
+  - snmp-enum
+rate_limit: 5
+timeout: 10800
+safe_mode: true
+evidence_capture: true

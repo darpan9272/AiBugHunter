@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Send,
 } from "lucide-react";
+import { apiService } from "@/lib/api";
 
 interface Report {
   id: string;
@@ -40,9 +41,8 @@ export default function ReportsPage() {
     try {
       const params = new URLSearchParams();
       if (filterStatus) params.set("status", filterStatus);
-      const res = await fetch(`/api/reports?${params.toString()}`);
-      const data = await res.json();
-      if (data.reports) setReports(data.reports);
+      const res = await apiService.reports.getAll();
+      if (res.data && Array.isArray(res.data.reports)) setReports(res.data.reports);
     } catch (err) {
       console.error("Failed to load reports", err);
     } finally {
@@ -56,11 +56,7 @@ export default function ReportsPage() {
 
   async function updateStatus(id: string, newStatus: string) {
     try {
-      await fetch("/api/reports", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: newStatus }),
-      });
+      await apiService.reports.update(id, { status: newStatus });
       loadReports();
     } catch (err) {
       console.error("Failed to update status", err);

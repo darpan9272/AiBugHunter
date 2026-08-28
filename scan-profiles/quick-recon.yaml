@@ -1,0 +1,16 @@
+name: "Quick Reconnaissance"
+description: "Fast initial reconnaissance for scope validation"
+type: "recon"
+recon:
+  - subfinder
+  - httpx
+  - nuclei (tech detect only)
+triage:
+  - basic-tech-fingerprint
+  - open-port-check
+exploit:  # No exploitation in quick recon
+  - none
+rate_limit: 50
+timeout: 1800
+safe_mode: true
+evidence_capture: false

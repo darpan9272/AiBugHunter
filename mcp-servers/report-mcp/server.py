@@ -336,5 +336,47 @@ async def main():
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
+# ─────────────────────────────────────────────
+# HTTP bridge — lets the harness engine call tools over HTTP.
+# (stdio MCP mode still available via MCP_STDIO=1)
+# ─────────────────────────────────────────────
+def _run_http_bridge():
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    import uvicorn
+
+    app = FastAPI(title="report-mcp http bridge")
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok", "server": "report-mcp"}
+
+    @app.get("/tools")
+    async def tools():
+        return await list_tools()
+
+    @app.post("/call")
+    async def call(payload: dict):
+        tool_name = payload.get("name", "")
+        arguments = payload.get("arguments", {}) or {}
+        try:
+            # run in a worker thread so long tools don't block the HTTP loop
+            def _exec():
+                return asyncio.run(call_tool(tool_name, arguments))
+            result = await asyncio.to_thread(_exec)
+            text = result[0].text if result else ""
+            return {"ok": True, "result": text}
+        except KeyError as e:
+            return JSONResponse(status_code=400, content={"error": f"Missing argument: {e}"})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    port = int(os.getenv("HTTP_PORT", "8003"))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    if os.getenv("MCP_STDIO") == "1":
+        asyncio.run(main())
+    else:
+        _run_http_bridge()

@@ -1,0 +1,5 @@
+in_scope:
+  - "box.com"
+  - ".*\\.box\\.com"
+  - ".*\\.boxcloud\\.com"
+out_of_scope: []

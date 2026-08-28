@@ -3,16 +3,31 @@ import { Agent, chat } from './ai-providers';
 
 /**
  * Orchestrates multiple AI agents to perform a coordinated bug hunting scan
- * on a given programme.
+ * on a given programme using scan profiles.
  */
 export async function launchCoordinatedScan(scanJobId: string, programmeId: string, agentIds: string[]) {
   try {
-    // 1. Fetch Programme Details
+    // 1. Fetch Scan Job Details (to get scan profile ID)
+    const scanJobRes = await query(`SELECT * FROM scan_jobs WHERE id = $1`, [scanJobId]);
+    if (scanJobRes.rows.length === 0) throw new Error('Scan job not found');
+    const scanJob = scanJobRes.rows[0];
+    
+    // 2. Fetch Programme Details
     const progRes = await query(`SELECT * FROM programmes WHERE id = $1`, [programmeId]);
     if (progRes.rows.length === 0) throw new Error('Programme not found');
     const programme = progRes.rows[0];
     
-    // 2. Fetch Assigned Agents
+    // 3. Fetch Scan Profile (if specified)
+    let scanProfile = null;
+    if (scanJob.scan_profile_id) {
+      const profileRes = await query(`SELECT * FROM scan_profiles WHERE id = $1`, [scanJob.scan_profile_id]);
+      if (profileRes.rows.length > 0) {
+        scanProfile = profileRes.rows[0];
+        await logActivity(scanJobId, null, 'Scan Profile Loaded', `Using scan profile: ${scanProfile.name}`);
+      }
+    }
+
+    // 4. Fetch Assigned Agents
     // We only want the active agents among those assigned
     const agentsRes = await query(
       `SELECT * FROM ai_agents WHERE id = ANY($1) AND status = 'active'`,
@@ -31,11 +46,18 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
     // Group agents by role
     const reconAgents = agents.filter(a => a.role === 'recon');
     const vulnAnalyzerAgents = agents.filter(a => a.role === 'vuln_analyzer');
+    const exploitAgents = agents.filter(a => a.role === 'exploit');
     // For now, if no specialized agents exist, fallback to general ones if needed.
-    const generalAgents = agents.filter(a => a.role === 'general' || a.role === 'triage' || a.role === 'exploit'); // simplified fallback
+    const generalAgents = agents.filter(a => a.role === 'general'); // simplified fallback
 
     // ── Phase 1: Reconnaissance ──
     await logActivity(scanJobId, null, 'Phase 1: Recon', 'Starting recon phase across specialized agents.');
+    
+    // Determine which tools to use based on scan profile
+    const reconTools = scanProfile ? scanProfile.recon_tools : ['subfinder', 'httpx'];
+    const reconToolDescription = reconTools.length > 0
+      ? `Focus on using these tools: ${reconTools.join(', ')}`
+      : 'Use standard reconnaissance techniques';
     
     const activeReconAgents = reconAgents.length > 0 ? reconAgents : generalAgents;
     
@@ -47,9 +69,23 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
             await logActivity(scanJobId, agent.id, 'Scanning', `Analyzing scope: ${JSON.stringify(programme.scope)}`);
             
             try {
-                // Mock prompt for actual tool execution / analysis
-                const systemPrompt = `You are a world-class Reconnaissance Agent. Analyze the following in-scope domains: ${JSON.stringify(programme.scope)}. Identify potential subdomains, interesting endpoints, and parameters. Return your findings as a JSON array of objects with keys: type (subdomain/endpoint/param/service), target (the string), and metadata (JSON object).`;
-                const response = await chat(agent, [{ role: 'system', content: systemPrompt }, { role: 'user', content: 'Begin reconnaissance and output strictly valid JSON array.' }]);
+                // Enhanced prompt for reconnaissance agent
+                const systemPrompt = `You are a world-class Reconnaissance Agent. 
+                Analyze the following in-scope domains: ${JSON.stringify(programme.scope)}.
+                ${reconToolDescription}
+                Identify potential subdomains, interesting endpoints, parameters, and services.
+                Return your findings as a JSON array of objects with keys: 
+                type (subdomain/endpoint/param/service), 
+                target (the string), 
+                metadata (JSON object including any relevant details like status, tech, etc).`;
+                
+                const response = await chat(agent, [{ 
+                  role: 'system', 
+                  content: systemPrompt 
+                }, { 
+                  role: 'user', 
+                  content: 'Begin reconnaissance and output strictly valid JSON array.' 
+                }]);
                 
                 let findings: any[] = [];
                 try {
@@ -70,7 +106,7 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
                      if(!f.type || !f.target) continue;
                      await query(
                         `INSERT INTO findings (programme_id, type, target, metadata, triage_reason) VALUES ($1, $2, $3, $4, $5)`,
-                        [programme.id, f.type, f.target, JSON.stringify(f.metadata || {}), `Found by agent ${agent.nickname || agent.model}`]
+                        [programme.id, f.type, f.target, JSON.stringify(f.metadata || {}), `Found by agent ${agent.nickname || agent.model} using scan profile: ${scanProfile?.name || 'default'}`]
                      );
                 }
                 
@@ -87,6 +123,12 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
     // ── Phase 2: Vulnerability Analysis & Triage ──
     await logActivity(scanJobId, null, 'Phase 2: Vuln Analysis', 'Aggregating findings for vulnerability analysis.');
     
+    // Determine which tools to use based on scan profile
+    const triageTools = scanProfile ? scanProfile.triage_tools : ['cve_check', 'tech_fingerprint'];
+    const triageToolDescription = triageTools.length > 0
+      ? `Focus on using these triage techniques: ${triageTools.join(', ')}`
+      : 'Use standard vulnerability analysis techniques';
+    
     const activeVulnAgents = vulnAnalyzerAgents.length > 0 ? vulnAnalyzerAgents : generalAgents;
     
     if(activeVulnAgents.length === 0) {
@@ -102,9 +144,22 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
                 
                 try {
                     const findingsJson = JSON.stringify(newFindings.map(f => ({id: f.id, type: f.type, target: f.target, metadata: f.metadata})));
-                    const systemPrompt = `You are an expert Vulnerability Triage Agent. Analyze these targets: ${findingsJson}. Score their likelihood of containing a critical vulnerability from 0.0 to 1.0. Output a JSON array of objects with keys: id (finding id), score (float), reason (string explaining the score).`;
+                    const systemPrompt = `You are an expert Vulnerability Triage Agent. 
+                    Analyze these targets: ${findingsJson}.
+                    ${triageToolDescription}
+                    Score their likelihood of containing a critical vulnerability from 0.0 to 1.0. 
+                    Output a JSON array of objects with keys: 
+                    id (finding id), 
+                    score (float), 
+                    reason (string explaining the score and which techniques were used).`;
                     
-                    const response = await chat(agent, [{ role: 'system', content: systemPrompt }, { role: 'user', content: 'Begin analysis and output strictly valid JSON array.' }]);
+                    const response = await chat(agent, [{ 
+                      role: 'system', 
+                      content: systemPrompt 
+                    }, { 
+                      role: 'user', 
+                      content: 'Begin analysis and output strictly valid JSON array.' 
+                    }]);
                     
                      let scores: any[] = [];
                      try {
@@ -132,6 +187,97 @@ export async function launchCoordinatedScan(scanJobId: string, programmeId: stri
 
             await Promise.allSettled(vulnPromises);
         }
+    }
+
+    // ── Phase 3: Exploitation (if high/medium findings found) ──
+    await logActivity(scanJobId, null, 'Phase 3: Exploitation', 'Checking for exploitable vulnerabilities...');
+    
+    // Determine which tools to use based on scan profile
+    const exploitTools = scanProfile ? scanProfile.exploit_tools : [];
+    const exploitToolDescription = exploitTools.length > 0
+      ? `Focus on using these exploitation tools: ${exploitTools.join(', ')}`
+      : 'Use standard exploitation techniques';
+    
+    // Check if we have any medium or high severity findings to exploit
+    const mediumHighFindingsRes = await query(
+      `SELECT COUNT(*) FROM findings WHERE programme_id = $1 AND triage_score >= 0.4`, 
+      [programmeId]
+    );
+    const mediumHighCount = parseInt(mediumHighFindingsRes.rows[0].count);
+    
+    if (mediumHighCount > 0 && exploitAgents.length > 0) {
+        await logActivity(scanJobId, null, 'Exploitation Phase', `Found ${mediumHighCount} medium/high severity findings to exploit.`);
+        
+        // Fetch medium/high findings for exploitation
+        const exploitFindingsRes = await query(
+          `SELECT * FROM findings WHERE programme_id = $1 AND triage_score >= 0.4 LIMIT 10`, 
+          [programmeId]
+        );
+        const exploitFindings = exploitFindingsRes.rows;
+
+        if(exploitFindings.length > 0) {
+            const exploitPromises = exploitAgents.map(async (agent) => {
+                await logActivity(scanJobId, agent.id, 'Exploiting', `Attempting to exploit ${exploitFindings.length} findings.`);
+                
+                try {
+                    const findingsJson = JSON.stringify(exploitFindings.map(f => ({id: f.id, type: f.type, target: f.target, metadata: f.metadata})));
+                    const systemPrompt = `You are an expert Exploitation Agent. 
+                    Analyze these targets for exploitation opportunities: ${findingsJson}.
+                    ${exploitToolDescription}
+                    Attempt to validate vulnerabilities with safe, non-destructive testing.
+                    Output a JSON array of objects with keys: 
+                    id (finding id), 
+                    success (boolean), 
+                    vulnerability_type (string), 
+                    evidence (JSON object with proof of concept or validation details),
+                    confidence (float 0-1).`;
+                    
+                    const response = await chat(agent, [{ 
+                      role: 'system', 
+                      content: systemPrompt 
+                    }, { 
+                      role: 'user', 
+                      content: 'Begin exploitation testing and output strictly valid JSON array.' 
+                    }]);
+                    
+                     let results: any[] = [];
+                     try {
+                         const jsonMatch = response.text.match(/\[[\s\S]*\]/);
+                         if (jsonMatch) results = JSON.parse(jsonMatch[0]);
+                         else results = JSON.parse(response.text);
+                     } catch (e) {
+                         await logActivity(scanJobId, agent.id, 'Warning', 'Failed to parse exploitation results JSON.', response.promptTokens, response.completionTokens);
+                         return;
+                     }
+
+                     // Log exploitation results
+                     for(const r of results) {
+                         if(!r.id) continue;
+                         await query(
+                             `INSERT INTO exploit_attempts (finding_id, agent_type, payload, response_snippet, success, confidence, evidence) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                             [
+                               r.id,
+                               agent.nickname || agent.model,
+                               r.payload || '',
+                               (r.evidence && JSON.stringify(r.evidence).substring(0, 500)) || '',
+                               r.success || false,
+                               r.confidence || 0.5,
+                               JSON.stringify(r.evidence || {})
+                             ]
+                         );
+                     }
+                     
+                     await logActivity(scanJobId, agent.id, 'Exploitation Complete', `Tested ${results.length} findings for exploitation.`, response.promptTokens, response.completionTokens);
+
+                } catch (err: any) {
+                    await logActivity(scanJobId, agent.id, 'Error', `Exploitation task failed: ${err.message}`);
+                }
+            });
+
+            await Promise.allSettled(exploitPromises);
+        }
+    } else {
+        await logActivity(scanJobId, null, 'Exploitation Phase Skipped', 'No medium/high findings found or no exploitation agents available.');
     }
 
 

@@ -66,14 +66,26 @@ class VulnContext:
 
 class VectorStore:
     def __init__(self):
-        self.client = chromadb.HttpClient(
-            host=CHROMA_HOST,
-            port=CHROMA_PORT,
-            settings=Settings(
-                chroma_client_auth_provider="chromadb.auth.token.TokenAuthClientProvider",
-                chroma_client_auth_credentials=CHROMA_AUTH_TOKEN,
-            ) if CHROMA_AUTH_TOKEN else Settings(),
-        )
+        if CHROMA_AUTH_TOKEN:
+            try:
+                # chromadb >= 1.x: plain bearer header
+                self.client = chromadb.HttpClient(
+                    host=CHROMA_HOST,
+                    port=CHROMA_PORT,
+                    headers={"Authorization": f"Bearer {CHROMA_AUTH_TOKEN}"},
+                )
+            except TypeError:
+                # older chromadb: token auth provider
+                self.client = chromadb.HttpClient(
+                    host=CHROMA_HOST,
+                    port=CHROMA_PORT,
+                    settings=Settings(
+                        chroma_client_auth_provider="chromadb.auth.token.TokenAuthClientProvider",
+                        chroma_client_auth_credentials=CHROMA_AUTH_TOKEN,
+                    ),
+                )
+        else:
+            self.client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
         self._init_collections()
 
     def _init_collections(self):

@@ -116,3 +116,120 @@ INSERT INTO strategy_versions (version, config, meta_reasoning) VALUES (
     }',
     'Initial default strategy. No learning data yet.'
 );
+
+-- ─────────────────────────────────────────────
+-- Multi-AI Agent Hub (see scripts/migrate_agents.sql for the
+-- standalone version of this migration for existing databases)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS ai_agents (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider    TEXT NOT NULL,
+    model       TEXT NOT NULL,
+    api_key     TEXT NOT NULL,
+    base_url    TEXT,
+    role        TEXT DEFAULT 'general',
+    status      TEXT DEFAULT 'active',
+    nickname    TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS scan_jobs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    programme_id    UUID REFERENCES programmes(id),
+    status          TEXT DEFAULT 'running',
+    agents_assigned JSONB DEFAULT '[]',
+    started_at      TIMESTAMPTZ DEFAULT NOW(),
+    finished_at     TIMESTAMPTZ,
+    summary         JSONB DEFAULT '{}', scan_profile_id    UUID REFERENCES scan_profiles(id)
+);
+
+CREATE TABLE IF NOT EXISTS agent_activity (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    scan_job_id UUID REFERENCES scan_jobs(id),
+    agent_id    UUID REFERENCES ai_agents(id),
+    action      TEXT NOT NULL,
+    detail      TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_activity_scan ON agent_activity(scan_job_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scan_jobs_programme ON scan_jobs(programme_id);
+
+-- ─────────────────────────────────────────────
+-- Scan Profiles -- predefined hunting configurations
+-- ─────────────────────────────────────────────
+CREATE TABLE scan_profiles (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name            TEXT NOT NULL UNIQUE,
+    description     TEXT,
+    scan_type       TEXT NOT NULL, -- web, network, web-app-specific, etc
+    recon_tools     TEXT[] NOT NULL DEFAULT '{}',
+    triage_tools    TEXT[] NOT NULL DEFAULT '{}',
+    exploit_tools   TEXT[] NOT NULL DEFAULT '{}',
+    rate_limit      INTEGER NOT NULL DEFAULT 10,
+    timeout         INTEGER NOT NULL DEFAULT 3600, -- seconds
+    safe_mode       BOOLEAN NOT NULL DEFAULT TRUE,
+    evidence_capture BOOLEAN NOT NULL DEFAULT TRUE,
+    config          JSONB DEFAULT '{}', -- tool-specific configs
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for better query performance
+CREATE INDEX idx_scan_profiles_name ON scan_profiles(name);
+CREATE INDEX idx_scan_profiles_type ON scan_profiles(scan_type);
+
+-- Insert default scan profiles
+INSERT INTO scan_profiles (name, description, scan_type, recon_tools, triage_tools, exploit_tools, rate_limit, timeout, safe_mode, evidence_capture, config) VALUES
+(
+    'Quick Reconnaissance',
+    'Fast initial reconnaissance for scope validation',
+    'recon',
+    ARRAY['subfinder', 'httpx', 'nuclei_info'],
+    ARRAY['basic_tech_fingerprint', 'open_port_check'],
+    ARRAY[], -- No exploitation in quick recon
+    50,
+    1800,
+    TRUE,
+    FALSE,
+    '{}'::jsonb
+),
+(
+    'Web Application Deep Scan',
+    'Comprehensive web application security assessment',
+    'web',
+    ARRAY['subfinder', 'amass', 'gau', 'waybackurls', 'gospider', 'katana', 'httpx', 'nuclei_info'],
+    ARRAY['cve_check', 'tech_fingerprint', 'auth_detection', 'admin_panel_finder', 'parameter_miner', 'javascript_analyzer'],
+    ARRAY['nuclei_exploit', 'sqlmap', 'dalfox', 'ssrf_tester', 'lfi_scanner', 'rce_scanner', 'xxe_injector', 'open_redirect_checker'],
+    10,
+    7200,
+    TRUE,
+    TRUE,
+    '{}'::jsonb
+),
+(
+    'External Network Perimeter Scan',
+    'External network discovery and vulnerability assessment',
+    'network',
+    ARRAY['nmap_discovery', 'masscan', 'zonetransfer', 'dnsrecon', 'shodan', 'censys', 'httpx'],
+    ARRAY['service_version_detection', 'cve_check', 'default_credential_check', 'anonymous_access_check', 'ssl_tls_analyzer'],
+    ARRAY['nmap_vuln_scripts', 'nikto', 'metasploit_selective', 'smbclient_check', 'rdp_check', 'snmp_enum'],
+    5,
+    10800,
+    TRUE,
+    TRUE,
+    '{}'::jsonb
+),
+(
+    'WordPress Security Audit',
+    'Specialized WordPress vulnerability assessment',
+    'web-app-specific',
+    ARRAY['wpscan', 'httpx', 'gau', 'waybackurls'],
+    ARRAY['wordpress_version_check', 'plugin_enumeration', 'theme_enumeration', 'user_enumeration', 'config_file_check', 'xmlrpc_check'],
+    ARRAY['wpscan_exploits', 'sqlmap_wp', 'rce_via_plugin', 'file_upload_vectors', 'admin_takeover_attempts'],
+    15,
+    5400,
+    TRUE,
+    TRUE,
+    '{"wp_api_token": ""}'::jsonb
+);

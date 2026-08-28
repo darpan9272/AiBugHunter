@@ -1,0 +1,32 @@
+name: "Web Application Deep Scan"
+description: "Comprehensive web application security assessment"
+type: "web"
+recon:
+  - subfinder
+  - amass
+  - gau
+  - waybackurls
+  - gospider
+  - katana
+  - httpx
+  - nuclei (for tech fingerprinting)
+triage:
+  - cve-check
+  - tech-fingerprint
+  - auth-detection
+  - admin-panel-finder
+  - parameter-miner
+  - javascript-analyzer
+exploit:
+  - nuclei-templates
+  - sqlmap-light
+  - xss-scanner
+  - ssrf-prober
+  - lfi-scanner
+  - rce-scanner
+  - xxе-injector
+  - open-redirect-checker
+rate_limit: 10
+timeout: 7200
+safe_mode: true
+evidence_capture: true

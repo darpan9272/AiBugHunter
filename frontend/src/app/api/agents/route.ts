@@ -3,9 +3,9 @@ import { query } from '@/lib/db';
 
 async function syncEnvAgents() {
   const envAgents = [
-    { provider: 'openai', model: 'gpt-4o', key: process.env.OPENAI_API_KEY, nickname: 'OpenAI (.env auto)' },
-    { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', key: process.env.ANTHROPIC_API_KEY, nickname: 'Anthropic (.env auto)' },
-    { provider: 'google', model: 'gemini-3.0-pro', key: process.env.GOOGLE_API_KEY, nickname: 'Gemini (.env auto)' }
+    { provider: 'openai', model: 'gpt-5.6-sol', key: process.env.OPENAI_API_KEY, nickname: 'OpenAI (.env auto)' },
+    { provider: 'anthropic', model: 'claude-opus-5', key: process.env.ANTHROPIC_API_KEY, nickname: 'Anthropic (.env auto)' },
+    { provider: 'google', model: 'gemini-3.1-pro-preview', key: process.env.GOOGLE_API_KEY, nickname: 'Gemini (.env auto)' }
   ];
 
   for (const agent of envAgents) {
@@ -17,6 +17,9 @@ async function syncEnvAgents() {
           `INSERT INTO ai_agents (provider, model, api_key, role, nickname, status) VALUES ($1, $2, $3, $4, $5, 'active')`,
           [agent.provider, agent.model, agent.key, 'general', agent.nickname]
         );
+      } else {
+        // Keep the auto-synced row's model current when the default changes above
+        await query(`UPDATE ai_agents SET model = $1 WHERE id = $2`, [agent.model, res.rows[0].id]);
       }
     }
   }

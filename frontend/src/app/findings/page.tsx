@@ -1,23 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, ChevronDown, X, ExternalLink } from "lucide-react";
+import { Filter, X, Link2, FileSearch } from "lucide-react";
+import { apiService } from "@/lib/api";
+import {
+  PageHeader,
+  Card,
+  EmptyState,
+  Skeleton,
+  SeverityPill,
+  severityFromScore,
+  formatDate,
+} from "@/components/ui";
 
 interface Finding {
   id: string;
   target: string;
   type: string;
-  triage_score: number;
-  triage_reason: string;
-  metadata: any;
+  triage_score: number | null;
+  triage_reason: string | null;
+  metadata: unknown;
   created_at: string;
-  programme_name: string;
+  programme_name: string | null;
+}
+
+interface ProgrammeRef {
+  id: string;
+  name: string;
+}
+
+function scorePct(score: number | null | undefined): number {
+  const s = typeof score === "number" && Number.isFinite(score) ? score : 0;
+  return Math.max(0, Math.min(100, Math.round(s * 100)));
+}
+
+function safeJson(value: unknown): string {
+  if (value == null) return "";
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return typeof value === "string" ? value : String(value);
+  }
 }
 
 export default function FindingsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
-  const [programmes, setProgrammes] = useState<any[]>([]);
+  const [programmes, setProgrammes] = useState<ProgrammeRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
 
@@ -26,195 +56,285 @@ export default function FindingsPage() {
   const [filterType, setFilterType] = useState("");
   const [filterMinScore, setFilterMinScore] = useState("");
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterProgramme) params.set("programme_id", filterProgramme);
-      if (filterType) params.set("type", filterType);
-      if (filterMinScore) params.set("min_score", filterMinScore);
-
       const [findingsRes, progRes] = await Promise.all([
-        fetch(`/api/findings?${params.toString()}`).then((r) => r.json()),
-        fetch("/api/programmes").then((r) => r.json()),
+        apiService.findings.getAll(),
+        apiService.programmes.getAll(),
       ]);
-      if (findingsRes.findings) setFindings(findingsRes.findings);
-      if (progRes.programmes) setProgrammes(progRes.programmes);
+      let filteredFindings = findingsRes.data && Array.isArray(findingsRes.data.findings)
+        ? findingsRes.data.findings
+        : [];
+
+      // Apply filters
+      if (filterProgramme) {
+        filteredFindings = filteredFindings.filter(f => f.programme_name === filterProgramme);
+      }
+      if (filterType) {
+        filteredFindings = filteredFindings.filter(f => f.type === filterType);
+      }
+      if (filterMinScore) {
+        const minScore = parseFloat(filterMinScore);
+        if (!isNaN(minScore)) {
+          filteredFindings = filteredFindings.filter(f =>
+            f.triage_score !== null && f.triage_score >= minScore
+          );
+        }
+      }
+
+      setFindings(filteredFindings);
+      if (progRes.data && Array.isArray(progRes.data.programmes)) setProgrammes(progRes.data.programmes);
     } catch (err) {
       console.error("Failed to load findings", err);
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterProgramme, filterType, filterMinScore]);
 
   useEffect(() => {
     loadData();
-  }, [filterProgramme, filterType, filterMinScore]);
+  }, [loadData]);
 
-  const typeBadge = (type: string) => {
-    const colors: Record<string, string> = {
-      subdomain: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-      endpoint: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-      param: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-      service: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    };
-    return colors[type] || "bg-slate-500/20 text-slate-300 border-slate-500/30";
+  // Close the detail panel on Escape
+  useEffect(() => {
+    if (!selectedFinding) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSelectedFinding(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedFinding]);
+
+  const hasFilters = Boolean(filterProgramme || filterType || filterMinScore);
+  const clearFilters = () => {
+    setFilterProgramme("");
+    setFilterType("");
+    setFilterMinScore("");
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <header>
-        <h2 className="text-3xl font-bold tracking-tight text-white">
-          Findings
-        </h2>
-        <p className="text-slate-400 mt-1">
-          Attack surface discovered by recon agents
-        </p>
-      </header>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-8"
+    >
+      <PageHeader
+        title="Findings"
+        description="Attack surface discovered and triaged by the recon swarm."
+        icon={FileSearch}
+      />
 
-      {/* Filters Row */}
-      <div className="flex flex-wrap gap-4">
-        <div className="relative">
-          <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Filters */}
+      <section aria-label="Filters" className="flex flex-wrap items-end gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Filter className="h-4 w-4" aria-hidden="true" />
+          <span>Filter</span>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="filter-programme" className="sr-only">
+            Programme
+          </label>
           <select
+            id="filter-programme"
+            className="select min-w-[11rem]"
             value={filterProgramme}
             onChange={(e) => setFilterProgramme(e.target.value)}
-            className="bg-[rgba(30,41,59,0.5)] border border-[var(--color-panel-border)] rounded-xl pl-9 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 appearance-none min-w-[180px]"
           >
-            <option value="">All Programmes</option>
+            <option value="">All programmes</option>
             {programmes.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
-          <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
 
-        <div className="relative">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="filter-type" className="sr-only">
+            Finding type
+          </label>
           <select
+            id="filter-type"
+            className="select min-w-[9rem]"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="bg-[rgba(30,41,59,0.5)] border border-[var(--color-panel-border)] rounded-xl px-4 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 appearance-none min-w-[160px]"
           >
-            <option value="">All Types</option>
+            <option value="">All types</option>
             <option value="subdomain">Subdomain</option>
             <option value="endpoint">Endpoint</option>
             <option value="param">Parameter</option>
             <option value="service">Service</option>
           </select>
-          <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
 
-        <div className="relative">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="filter-score" className="sr-only">
+            Minimum triage score
+          </label>
           <select
+            id="filter-score"
+            className="select min-w-[9rem]"
             value={filterMinScore}
             onChange={(e) => setFilterMinScore(e.target.value)}
-            className="bg-[rgba(30,41,59,0.5)] border border-[var(--color-panel-border)] rounded-xl px-4 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 appearance-none min-w-[160px]"
           >
-            <option value="">Any Score</option>
-            <option value="0.7">High (≥ 0.7)</option>
-            <option value="0.4">Medium+ (≥ 0.4)</option>
-            <option value="0.1">Low+ (≥ 0.1)</option>
+            <option value="">Any score</option>
+            <option value="0.7">High (≥ 70%)</option>
+            <option value="0.4">Medium+ (≥ 40%)</option>
+            <option value="0.1">Low+ (≥ 10%)</option>
           </select>
-          <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
 
-        {(filterProgramme || filterType || filterMinScore) && (
-          <button
-            onClick={() => {
-              setFilterProgramme("");
-              setFilterType("");
-              setFilterMinScore("");
-            }}
-            className="flex items-center gap-1 px-3 py-2.5 text-sm text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" /> Clear Filters
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="btn btn-ghost btn-sm">
+            <X className="h-4 w-4" aria-hidden="true" />
+            Clear
           </button>
         )}
-      </div>
+      </section>
 
-      {/* Findings Table */}
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[rgba(30,41,59,0.5)] text-slate-400 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-medium">Type</th>
-                <th className="px-6 py-4 font-medium">Target</th>
-                <th className="px-6 py-4 font-medium">Programme</th>
-                <th className="px-6 py-4 font-medium">Triage Score</th>
-                <th className="px-6 py-4 font-medium">Discovered</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-panel-border)] text-sm">
-              {loading ? (
-                [1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td className="px-6 py-4"><div className="h-6 w-20 bg-slate-700/50 rounded-full" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-48 bg-slate-700/50 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-24 bg-slate-700/50 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-2 w-16 bg-slate-700/50 rounded-full" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-20 bg-slate-700/50 rounded" /></td>
+      {/* Findings */}
+      <Card>
+        {loading ? (
+          <div className="space-y-3 p-5">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="hidden h-4 w-24 sm:block" />
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
+          </div>
+        ) : findings.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={FileSearch}
+              title={hasFilters ? "No findings match these filters" : "No findings yet"}
+              description={
+                hasFilters
+                  ? "Try widening the score threshold or clearing the type filter."
+                  : "Run a recon scan against a programme to populate the attack surface here."
+              }
+              action={
+                hasFilters ? (
+                  <button type="button" onClick={clearFilters} className="btn btn-secondary btn-sm">
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase tracking-wider text-subtle">
+                    <th className="px-5 py-3 font-medium">Severity</th>
+                    <th className="px-5 py-3 font-medium">Finding</th>
+                    <th className="px-5 py-3 font-medium">Programme</th>
+                    <th className="px-5 py-3 font-medium">Score</th>
+                    <th className="px-5 py-3 font-medium">Detected</th>
                   </tr>
-                ))
-              ) : findings.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
-                    <Search className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-                    <p className="text-lg font-medium text-slate-400">No findings yet</p>
-                    <p className="text-sm">Run a recon scan to populate attack surface data</p>
-                  </td>
-                </tr>
-              ) : (
-                findings.map((f, i) => (
-                  <motion.tr
-                    key={f.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    onClick={() => setSelectedFinding(f)}
-                    className="hover:bg-[rgba(255,255,255,0.02)] transition-colors cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${typeBadge(f.type)}`}>
-                        {f.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-xs text-cyan-300 truncate max-w-xs flex items-center gap-1.5">
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                        {f.target}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">{f.programme_name}</td>
-                    <td className="px-6 py-4">
-                      {f.triage_score !== null ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">
-                            {(f.triage_score * 10).toFixed(1)}
-                          </span>
-                          <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-cyan-400 to-purple-500"
-                              style={{ width: `${f.triage_score * 100}%` }}
-                            />
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {findings.map((f) => {
+                    const pct = scorePct(f.triage_score);
+                    return (
+                      <tr
+                        key={f.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View details for ${f.type} ${f.target}`}
+                        onClick={() => setSelectedFinding(f)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedFinding(f);
+                          }
+                        }}
+                        className="cursor-pointer transition-colors hover:bg-surface-2/50 focus:bg-surface-2/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        <td className="px-5 py-3">
+                          <SeverityPill severity={severityFromScore(f.triage_score)} />
+                        </td>
+                        <td className="px-5 py-3">
+                          <div className="font-medium capitalize text-foreground">{f.type}</div>
+                          <div className="flex max-w-xs items-center gap-1.5 truncate font-mono text-xs text-subtle">
+                            <Link2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{f.target}</span>
                           </div>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-slate-400 text-xs">
-                      {new Date(f.created_at).toLocaleDateString()}
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        </td>
+                        <td className="px-5 py-3 text-muted-foreground">
+                          {f.programme_name || "—"}
+                        </td>
+                        <td className="px-5 py-3">
+                          {f.triage_score === null ? (
+                            <span className="text-subtle">—</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="tabular-nums font-medium text-foreground">
+                                {pct}%
+                              </span>
+                              <div
+                                className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2"
+                                role="presentation"
+                              >
+                                <div
+                                  className="h-full rounded-full bg-accent"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-muted-foreground">
+                          {formatDate(f.created_at)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile stacked cards */}
+            <ul className="divide-y divide-border md:hidden">
+              {findings.map((f) => {
+                const pct = scorePct(f.triage_score);
+                return (
+                  <li key={f.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFinding(f)}
+                      className="flex w-full flex-col gap-2 px-5 py-4 text-left transition-colors hover:bg-surface-2/50 focus:bg-surface-2/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <SeverityPill severity={severityFromScore(f.triage_score)} />
+                        <span className="tabular-nums text-xs text-muted-foreground">
+                          {f.triage_score === null ? "—" : `${pct}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium capitalize text-foreground">{f.type}</p>
+                        <p className="truncate font-mono text-xs text-subtle">{f.target}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="truncate">{f.programme_name || "—"}</span>
+                        <span>{formatDate(f.created_at)}</span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </Card>
 
       {/* Detail Side Panel */}
       <AnimatePresence>
@@ -223,76 +343,88 @@ export default function FindingsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm"
             onClick={() => setSelectedFinding(null)}
           >
             <motion.div
-              initial={{ x: 300 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Finding details"
+              initial={{ x: 360 }}
               animate={{ x: 0 }}
-              exit={{ x: 300 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-full max-w-md glass-panel m-4 ml-0 rounded-l-2xl overflow-y-auto"
+              exit={{ x: 360 }}
+              transition={{ type: "spring", damping: 28, stiffness: 240 }}
+              className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-surface"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-[var(--color-panel-border)] flex justify-between items-center sticky top-0 bg-[var(--color-panel)] backdrop-blur-lg z-10">
-                <h3 className="text-lg font-semibold text-white">Finding Details</h3>
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface/95 px-5 py-4 backdrop-blur">
+                <h2 className="text-base font-semibold text-foreground">Finding details</h2>
                 <button
+                  type="button"
                   onClick={() => setSelectedFinding(null)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="icon-btn"
+                  aria-label="Close details"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
-              <div className="p-6 space-y-6">
+
+              <div className="space-y-6 p-5">
                 <div>
-                  <label className="text-xs text-slate-400 uppercase tracking-wider">Target</label>
-                  <p className="text-cyan-300 font-mono text-sm mt-1 break-all">
+                  <p className="label mb-1">Target</p>
+                  <p className="break-all font-mono text-sm text-accent">
                     {selectedFinding.target}
                   </p>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider">Type</label>
-                    <p className="text-white mt-1">{selectedFinding.type}</p>
+                    <p className="label mb-1">Type</p>
+                    <p className="capitalize text-foreground">{selectedFinding.type}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider">Programme</label>
-                    <p className="text-white mt-1">{selectedFinding.programme_name}</p>
+                    <p className="label mb-1">Programme</p>
+                    <p className="text-foreground">{selectedFinding.programme_name || "—"}</p>
                   </div>
                 </div>
+
                 {selectedFinding.triage_score !== null && (
                   <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider">Triage Score</label>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-2xl font-bold text-white">
-                        {(selectedFinding.triage_score * 10).toFixed(1)}
+                    <p className="label mb-2">Triage score</p>
+                    <div className="flex items-center gap-3">
+                      <SeverityPill
+                        severity={severityFromScore(selectedFinding.triage_score)}
+                      />
+                      <span className="text-2xl font-semibold tabular-nums text-foreground">
+                        {scorePct(selectedFinding.triage_score)}%
                       </span>
-                      <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-cyan-400 to-purple-500"
-                          style={{ width: `${selectedFinding.triage_score * 100}%` }}
-                        />
-                      </div>
+                    </div>
+                    <div
+                      className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2"
+                      role="presentation"
+                    >
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${scorePct(selectedFinding.triage_score)}%` }}
+                      />
                     </div>
                   </div>
                 )}
+
                 {selectedFinding.triage_reason && (
                   <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider">Triage Reason</label>
-                    <p className="text-slate-300 text-sm mt-1">{selectedFinding.triage_reason}</p>
+                    <p className="label mb-1">Triage reason</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedFinding.triage_reason}
+                    </p>
                   </div>
                 )}
-                {selectedFinding.metadata && (
+
+                {safeJson(selectedFinding.metadata) && (
                   <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider">Metadata</label>
-                    <pre className="mt-2 p-4 bg-[rgba(15,23,42,0.8)] rounded-lg text-xs text-slate-300 overflow-x-auto">
-                      {JSON.stringify(
-                        typeof selectedFinding.metadata === "string"
-                          ? JSON.parse(selectedFinding.metadata)
-                          : selectedFinding.metadata,
-                        null,
-                        2
-                      )}
+                    <p className="label mb-2">Metadata</p>
+                    <pre className="overflow-x-auto rounded-lg border border-border bg-background p-4 text-xs text-muted-foreground">
+                      {safeJson(selectedFinding.metadata)}
                     </pre>
                   </div>
                 )}
@@ -301,6 +433,6 @@ export default function FindingsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }

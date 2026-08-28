@@ -1,0 +1,26 @@
+name: "WordPress Security Audit"
+description: "Specialized WordPress vulnerability assessment"
+type: "web-app-specific"
+recon:
+  - wpscan
+  - httpx
+  - gau
+  - waybackurls
+triage:
+  - wordpress-version-check
+  - plugin-enumeration
+  - theme-enumeration
+  - user-enumeration
+  - config-file-check
+  - xmlrpc-check
+exploit:
+  - wpscan-exploits
+  - sqlmap-wp
+  - rce-via-plugin
+  - file-upload-vectors
+  - admin-takeover-attempts
+rate_limit: 15
+timeout: 5400
+safe_mode: true
+evidence_capture: true
+wp_api_token: ""  # Optional WPScan API token

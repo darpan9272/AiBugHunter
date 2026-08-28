@@ -1,23 +1,26 @@
 """
 Meta-Agent — The Self-Learning Brain
 
-Runs weekly (via Antigravity /schedule or cron).
+Runs weekly (via cron) or on-demand from the dashboard (/api/learning).
 Analyses all run outcomes and rewrites:
   1. Triage scoring weights
   2. Exploit agent priority order
   3. Strategy config (stored in Postgres + strategy_config.json)
   4. Agent system prompts (written back to agents/<agent>/system_prompt.md)
 
-Uses Claude Opus for deep reasoning about what changed and why.
+Provider-agnostic: works with ANY model.
+  Priority:
+    1. LEARNING_BASE_URL + LEARNING_API_KEY + LEARNING_MODEL
+       (any OpenAI-compatible endpoint: DeepSeek, Ollama, LM Studio, vLLM, ...)
+    2. ANTHROPIC_API_KEY + LEARNING_MODEL (defaults to Claude)
 """
 
 import json
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-import anthropic
 
 from outcome_store import (
     get_latest_strategy,
@@ -29,22 +32,66 @@ from outcome_store import (
 from vector_store import VectorStore, VulnContext
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+LEARNING_BASE_URL = os.getenv("LEARNING_BASE_URL", "")
+LEARNING_API_KEY = os.getenv("LEARNING_API_KEY", "")
+LEARNING_MODEL = os.getenv("LEARNING_MODEL", "")
 AGENTS_DIR = Path(os.getenv("AGENTS_DIR", "../agents"))
 STRATEGY_CONFIG_PATH = Path(os.getenv("STRATEGY_CONFIG_PATH", "./strategy_config.json"))
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 vector_store = VectorStore()
 
 
-def run_weekly_learning_cycle():
-    """Main entry point — full weekly learning cycle."""
+def ask_model(prompt: str, max_tokens: int = 4096) -> str:
+    """Send the analysis prompt to whichever model is configured."""
+    # Path 1: any OpenAI-compatible endpoint (DeepSeek, Ollama, LM Studio, vLLM...)
+    if LEARNING_BASE_URL:
+        import httpx
+
+        url = LEARNING_BASE_URL.rstrip("/") + "/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if LEARNING_API_KEY:
+            headers["Authorization"] = f"Bearer {LEARNING_API_KEY}"
+        resp = httpx.post(
+            url,
+            headers=headers,
+            json={
+                "model": LEARNING_MODEL or "default",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+            },
+            timeout=600,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"] or ""
+
+    # Path 2: Anthropic native
+    if ANTHROPIC_API_KEY:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model=LEARNING_MODEL or "claude-sonnet-4-5",
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text
+
+    raise RuntimeError(
+        "No model configured for learning. Set LEARNING_BASE_URL (+LEARNING_MODEL) "
+        "for any OpenAI-compatible/local server, or ANTHROPIC_API_KEY."
+    )
+
+
+def run_weekly_learning_cycle(days: int = 7):
+    """Main entry point — full learning cycle over the last N days."""
     print(f"\n{'='*60}")
     print(f"META-AGENT: Weekly Learning Cycle — {datetime.now(timezone.utc).isoformat()}")
     print(f"{'='*60}\n")
 
     # 1. Gather all data
     print("[1/6] Gathering outcome data...")
-    outcomes = get_outcomes_since(days=7)
+    outcomes = get_outcomes_since(days=days)
     success_rates = get_success_rates_by_vuln_type()
     acceptance_stats = get_report_acceptance_rate()
     current_strategy = get_latest_strategy()
@@ -84,17 +131,12 @@ def run_weekly_learning_cycle():
             )
     print(f"      Vector DB now: {vector_store.collection_stats()}")
 
-    # 3. Ask Claude Opus to analyse patterns and propose new strategy
-    print("[3/6] Running Claude Opus analysis...")
+    # 3. Ask the configured model to analyse patterns and propose new strategy
+    print("[3/6] Running Meta-Agent analysis...")
     analysis_prompt = _build_analysis_prompt(
         outcomes, success_rates, acceptance_stats, current_strategy
     )
-    response = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": analysis_prompt}],
-    )
-    analysis = response.content[0].text
+    analysis = ask_model(analysis_prompt, max_tokens=4096)
     print(f"      Analysis complete ({len(analysis)} chars)")
 
     # 4. Extract structured strategy update from analysis
@@ -219,4 +261,21 @@ def _extract_key_changes(analysis: str) -> str:
 
 
 if __name__ == "__main__":
-    run_weekly_learning_cycle()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Meta-Agent self-learning cycle")
+    parser.add_argument("--days", type=int, default=7, help="Look-back window in days")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON result")
+    args = parser.parse_args()
+
+    try:
+        result = run_weekly_learning_cycle(days=args.days)
+        if args.json:
+            print("\n===RESULT_JSON===")
+            print(json.dumps(result or {}, default=str))
+    except Exception as exc:  # surface errors to the dashboard
+        print(f"LEARNING_CYCLE_FAILED: {exc}", file=sys.stderr)
+        if args.json:
+            print("\n===RESULT_JSON===")
+            print(json.dumps({"error": str(exc)}))
+        sys.exit(1)

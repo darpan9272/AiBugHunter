@@ -10,21 +10,51 @@ import {
   Loader2,
   ExternalLink,
   Search,
-  Activity,
+  Play,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  PageHeader,
+  Card,
+  EmptyState,
+  Skeleton,
+  formatDate,
+} from "@/components/ui";
+import { apiService } from "@/lib/api";
 
 interface Programme {
   id: string;
   name: string;
   platform: string;
-  scope: any;
-  out_of_scope: any;
+  scope: unknown;
+  out_of_scope: unknown;
   finding_count: number;
   recon_run_count: number;
   total_tokens?: string | number;
   provider_tokens?: Record<string, number>;
   created_at: string;
+}
+
+const PLATFORM_CLS: Record<string, string> = {
+  hackerone: "text-success bg-success/12 border-success/40",
+  bugcrowd: "text-high bg-high/12 border-high/40",
+  intigriti: "text-low bg-low/12 border-low/40",
+  private: "text-muted-foreground bg-surface-2 border-border-strong",
+};
+
+function platformClass(platform: string): string {
+  return PLATFORM_CLS[(platform || "").toLowerCase()] || PLATFORM_CLS.private;
+}
+
+/** scope may arrive as a JSON string or an already-parsed object; never throw. */
+function inScopeDomains(scope: unknown): string[] {
+  try {
+    const parsed = typeof scope === "string" ? JSON.parse(scope) : scope;
+    const list = (parsed as { in_scope?: unknown } | null)?.in_scope;
+    return Array.isArray(list) ? (list as string[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function ProgramsPage() {
@@ -45,9 +75,9 @@ export default function ProgramsPage() {
 
   async function loadProgrammes() {
     try {
-      const res = await fetch("/api/programmes");
-      const data = await res.json();
-      if (data.programmes) setProgrammes(data.programmes);
+      setLoading(true);
+      const res = await apiService.programmes.getAll();
+      if (res.data) setProgrammes(res.data.programmes);
     } catch (err) {
       console.error("Failed to load programmes", err);
     } finally {
@@ -58,6 +88,16 @@ export default function ProgramsPage() {
   useEffect(() => {
     loadProgrammes();
   }, []);
+
+  // Close the modal on Escape
+  useEffect(() => {
+    if (!showModal) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowModal(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showModal]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -74,19 +114,14 @@ export default function ProgramsPage() {
       .filter(Boolean);
 
     try {
-      const res = await fetch("/api/programmes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formName,
-          platform: formPlatform,
-          in_scope: scopeLines,
-          out_of_scope: outOfScopeLines,
-        }),
+      const res = await apiService.programmes.create({
+        name: formName,
+        platform: formPlatform,
+        in_scope: scopeLines,
+        out_of_scope: outOfScopeLines,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to create programme");
+      if (res.error) {
+        setError(res.error || "Failed to create programme");
         return;
       }
       setShowModal(false);
@@ -105,7 +140,7 @@ export default function ProgramsPage() {
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete programme "${name}"? This cannot be undone.`)) return;
     try {
-      await fetch(`/api/programmes/${id}`, { method: "DELETE" });
+      await apiService.programmes.delete(id);
       loadProgrammes();
     } catch (err) {
       console.error("Failed to delete", err);
@@ -114,18 +149,12 @@ export default function ProgramsPage() {
 
   async function handleLaunchScan(programmeId: string) {
     try {
-      const res = await fetch("/api/scans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programme_id: programmeId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Redirect to the Scans page to watch it run
-        router.push("/scans");
-      } else {
-        alert(data.error || "Failed to launch scan");
+      const res = await apiService.scanJobs.create({ programme_id: programmeId });
+      if (res.error) {
+        alert(res.error || "Failed to launch scan");
+        return;
       }
+      router.push("/scans");
     } catch (err) {
       alert("Network error while launching scan");
     }
@@ -135,171 +164,187 @@ export default function ProgramsPage() {
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const platformBadge = (platform: string) => {
-    const colors: Record<string, string> = {
-      hackerone: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-      bugcrowd: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-      private: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-      intigriti: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    };
-    return colors[platform?.toLowerCase()] || colors.private;
-  };
+  const addButton = (
+    <button
+      type="button"
+      onClick={() => setShowModal(true)}
+      className="btn btn-primary"
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Add program
+    </button>
+  );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">
-            Programs
-          </h2>
-          <p className="text-slate-400 mt-1">
-            Manage your bug bounty targets and scope
-          </p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-medium rounded-xl hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all duration-300 active:scale-95"
-        >
-          <Plus className="w-5 h-5" />
-          Add Program
-        </button>
-      </header>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-8"
+    >
+      <PageHeader
+        title="Programs"
+        description="Manage your bug bounty targets and scope."
+        icon={Globe}
+        actions={addButton}
+      />
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle"
+          aria-hidden="true"
+        />
+        <label htmlFor="prog-search" className="sr-only">
+          Search programmes
+        </label>
         <input
-          type="text"
-          placeholder="Search programmes..."
+          id="prog-search"
+          type="search"
+          className="input pl-9"
+          placeholder="Search programmes…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-[rgba(30,41,59,0.5)] border border-[var(--color-panel-border)] rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all text-white placeholder-slate-500"
         />
       </div>
 
-      {/* Programmes Grid */}
+      {/* Programmes */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="glass-panel p-6 animate-pulse space-y-4">
-              <div className="h-5 w-32 bg-slate-700/50 rounded" />
-              <div className="h-3 w-48 bg-slate-700/50 rounded" />
-              <div className="h-3 w-24 bg-slate-700/50 rounded" />
-            </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} className="space-y-4 p-5">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-full" />
+            </Card>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-panel p-16 text-center"
-        >
-          <Globe className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">
-            {search ? "No matching programmes" : "No programmes yet"}
-          </h3>
-          <p className="text-slate-400 mb-6">
-            {search
-              ? "Try a different search term"
-              : "Add your first bug bounty programme to start hunting"}
-          </p>
-          {!search && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-medium rounded-xl hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add Your First Programme
-            </button>
-          )}
-        </motion.div>
+        <EmptyState
+          icon={Globe}
+          title={search ? "No matching programmes" : "No programmes yet"}
+          description={
+            search
+              ? "Try a different search term."
+              : "Add your first bug bounty programme to start hunting."
+          }
+          action={
+            !search ? (
+              <button
+                type="button"
+                onClick={() => setShowModal(true)}
+                className="btn btn-primary"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add your first programme
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p, i) => {
-            const scopeData =
-              typeof p.scope === "string" ? JSON.parse(p.scope) : p.scope;
-            const inScopeDomains = scopeData?.in_scope || [];
-
+            const domains = inScopeDomains(p.scope);
+            const tokenBreakdown = Object.entries(p.provider_tokens || {})
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(", ");
             return (
               <motion.div
                 key={p.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="glass-panel p-6 group hover:border-cyan-500/30 transition-all duration-300"
+                transition={{ delay: i * 0.04 }}
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-white truncate">
-                      {p.name}
-                    </h3>
-                    <span
-                      className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${platformBadge(p.platform)}`}
-                    >
-                      {p.platform || "Private"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(p.id, p.name)}
-                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Scope Domains */}
-                <div className="space-y-1.5 mb-4">
-                  {inScopeDomains.slice(0, 3).map((d: string, j: number) => (
-                    <div
-                      key={j}
-                      className="flex items-center gap-2 text-sm text-slate-300"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span className="truncate font-mono text-xs">{d}</span>
-                    </div>
-                  ))}
-                  {inScopeDomains.length > 3 && (
-                    <p className="text-xs text-slate-500">
-                      +{inScopeDomains.length - 3} more
-                    </p>
-                  )}
-                </div>
-
-                {/* Stats & Actions */}
-                <div className="flex justify-between items-center pt-4 border-t border-[var(--color-panel-border)] text-sm">
-                  <div className="flex gap-4">
-                    <div>
-                      <span className="text-slate-400">Findings</span>
-                      <span className="ml-2 text-white font-medium">
-                        {p.finding_count}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Scans</span>
-                      <span className="ml-2 text-white font-medium">
-                        {p.recon_run_count}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Tokens</span>
-                      <span 
-                        className="ml-2 text-purple-400 font-medium cursor-help" 
-                        title={Object.entries(p.provider_tokens || {}).map(([k,v]) => `${k}: ${v}`).join(', ')}
+                <Card className="flex h-full flex-col gap-4 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-base font-semibold text-foreground">
+                        {p.name}
+                      </h2>
+                      <span
+                        className={`mt-1.5 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${platformClass(
+                          p.platform
+                        )}`}
                       >
-                        {Number(p.total_tokens || 0).toLocaleString()}
+                        {p.platform || "private"}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(p.id, p.name)}
+                      aria-label={`Delete programme ${p.name}`}
+                      className="icon-btn shrink-0 text-subtle hover:text-danger"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
                   </div>
-                  
-                  <button
-                    onClick={() => handleLaunchScan(p.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 rounded-lg transition-colors font-medium text-xs border border-cyan-500/20"
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    Launch Scan
-                  </button>
-                </div>
+
+                  {/* In-scope domains */}
+                  <div className="min-h-[4.5rem] space-y-1.5">
+                    {domains.length === 0 ? (
+                      <p className="text-xs text-subtle">
+                        No in-scope domains listed.
+                      </p>
+                    ) : (
+                      <>
+                        {domains.slice(0, 3).map((d) => (
+                          <div
+                            key={d}
+                            className="flex items-center gap-2 text-sm text-muted-foreground"
+                          >
+                            <ExternalLink
+                              className="h-3.5 w-3.5 shrink-0 text-accent"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate font-mono text-xs">{d}</span>
+                          </div>
+                        ))}
+                        {domains.length > 3 && (
+                          <p className="text-xs text-subtle">
+                            +{domains.length - 3} more
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Stats & actions */}
+                  <div className="mt-auto flex items-end justify-between gap-3 border-t border-border pt-4">
+                    <dl className="flex gap-4 text-xs">
+                      <div className="flex flex-col">
+                        <dt className="text-subtle">Findings</dt>
+                        <dd className="font-semibold tabular-nums text-foreground">
+                          {p.finding_count}
+                        </dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-subtle">Scans</dt>
+                        <dd className="font-semibold tabular-nums text-foreground">
+                          {p.recon_run_count}
+                        </dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-subtle">Tokens</dt>
+                        <dd
+                          className="font-semibold tabular-nums text-accent"
+                          title={tokenBreakdown || undefined}
+                        >
+                          {Number(p.total_tokens || 0).toLocaleString()}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <button
+                      type="button"
+                      onClick={() => handleLaunchScan(p.id)}
+                      className="btn btn-secondary btn-sm shrink-0"
+                    >
+                      <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                      Scan
+                    </button>
+                  </div>
+                </Card>
               </motion.div>
             );
           })}
@@ -313,57 +358,71 @@ export default function ProgramsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
             onClick={() => setShowModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-programme-title"
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-panel w-full max-w-lg p-0 overflow-hidden"
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ type: "spring", damping: 26, stiffness: 260 }}
+              className="card w-full max-w-lg overflow-hidden p-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-[var(--color-panel-border)] flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-white">
-                  Add New Program
-                </h3>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-1 text-slate-400 hover:text-white transition-colors"
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <h2
+                  id="add-programme-title"
+                  className="text-lg font-semibold text-foreground"
                 >
-                  <X className="w-5 h-5" />
+                  Add program
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="icon-btn"
+                  aria-label="Close dialog"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreate} className="p-6 space-y-5">
+              <form onSubmit={handleCreate} className="space-y-5 p-5">
                 {error && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-sm">
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm text-danger"
+                  >
                     {error}
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Programme Name *
+                  <label htmlFor="prog-name" className="label mb-1.5 block">
+                    Programme name
                   </label>
                   <input
-                    type="text"
+                    id="prog-name"
+                    className="input"
                     required
+                    autoFocus
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="e.g. Tesla Bug Bounty"
-                    className="w-full bg-[rgba(15,23,42,0.8)] border border-[var(--color-panel-border)] rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    placeholder="e.g. Acme Bug Bounty"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="prog-platform" className="label mb-1.5 block">
                     Platform
                   </label>
                   <select
+                    id="prog-platform"
+                    className="select"
                     value={formPlatform}
                     onChange={(e) => setFormPlatform(e.target.value)}
-                    className="w-full bg-[rgba(15,23,42,0.8)] border border-[var(--color-panel-border)] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
                   >
                     <option value="private">Private</option>
                     <option value="hackerone">HackerOne</option>
@@ -373,51 +432,55 @@ export default function ProgramsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    In-Scope Domains * (one per line)
+                  <label htmlFor="prog-scope" className="label mb-1.5 block">
+                    In-scope domains{" "}
+                    <span className="font-normal text-subtle">(one per line)</span>
                   </label>
                   <textarea
+                    id="prog-scope"
+                    className="textarea font-mono text-sm"
                     required
                     rows={4}
                     value={formScope}
                     onChange={(e) => setFormScope(e.target.value)}
                     placeholder={"*.example.com\napi.example.com\nexample.com"}
-                    className="w-full bg-[rgba(15,23,42,0.8)] border border-[var(--color-panel-border)] rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Out-of-Scope Patterns (one per line, optional)
+                  <label htmlFor="prog-oos" className="label mb-1.5 block">
+                    Out-of-scope patterns{" "}
+                    <span className="font-normal text-subtle">(optional)</span>
                   </label>
                   <textarea
+                    id="prog-oos"
+                    className="textarea font-mono text-sm"
                     rows={2}
                     value={formOutOfScope}
                     onChange={(e) => setFormOutOfScope(e.target.value)}
                     placeholder={"support\\.example\\.com\nstaging\\..*"}
-                    className="w-full bg-[rgba(15,23,42,0.8)] border border-[var(--color-panel-border)] rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono text-sm"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-1">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 px-4 py-2.5 border border-[var(--color-panel-border)] text-slate-300 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                    className="btn btn-secondary flex-1"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-medium rounded-lg hover:shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="btn btn-primary flex-1"
                   >
                     {submitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Plus className="w-4 h-4" />
+                      <Plus className="h-4 w-4" aria-hidden="true" />
                     )}
-                    Create Programme
+                    Create
                   </button>
                 </div>
               </form>
@@ -425,6 +488,6 @@ export default function ProgramsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }

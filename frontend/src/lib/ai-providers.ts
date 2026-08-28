@@ -8,6 +8,8 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
+import type { ProviderRecord } from './providers';
+import { resolveCredential } from './credentials';
 
 export interface Agent {
   id: string;
@@ -22,6 +24,30 @@ export interface Agent {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+/**
+ * Chat using a ProviderRecord + model id (harness connector path).
+ * Local providers (Ollama/LM Studio/vLLM) work without any API key.
+ */
+export async function chatWithProvider(
+  provider: ProviderRecord,
+  model: string,
+  messages: ChatMessage[],
+  options?: { maxTokens?: number; temperature?: number }
+): Promise<{ text: string; promptTokens: number; completionTokens: number }> {
+  const agent: Agent = {
+    id: provider.id,
+    provider: provider.kind === 'ollama' ? 'openai' : provider.kind,
+    model,
+    api_key: resolveCredential(provider.api_key) || 'local-no-key-needed',
+    base_url:
+      provider.kind === 'ollama'
+        ? `${(provider.base_url || 'http://localhost:11434').replace(/\/+$/, '')}/v1`
+        : provider.base_url,
+    role: 'general',
+  };
+  return chat(agent, messages, options);
 }
 
 /**

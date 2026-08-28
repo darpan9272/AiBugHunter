@@ -2,20 +2,23 @@ FROM python:3.12-slim
 
 # Install recon tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget git nmap unzip ca-certificates && \
+    curl wget git nmap unzip ca-certificates dnsutils whois && \
     rm -rf /var/lib/apt/lists/*
 
 # Use matching pre-compiled binaries instead of Go to avoid memory exhaustion during build.
 RUN ARCH="$(dpkg --print-architecture)" && \
     wget -qO pdtm.zip "https://github.com/projectdiscovery/pdtm/releases/download/v0.1.5/pdtm_0.1.5_linux_${ARCH}.zip" && \
     unzip pdtm.zip && mv pdtm /usr/local/bin/ && rm pdtm.zip && \
-    pdtm -i subfinder,httpx,katana,nuclei
+    pdtm -i subfinder,httpx,katana,nuclei,dnsx,naabu,waybackurls
 
 ENV PATH="/root/.pdtm/go/bin:${PATH}"
 
 RUN ARCH="$(dpkg --print-architecture)" && \
     wget -qO gau.tar.gz "https://github.com/lc/gau/releases/download/v2.2.4/gau_2.2.4_linux_${ARCH}.tar.gz" && \
     tar -xzf gau.tar.gz -C /usr/local/bin gau && rm gau.tar.gz
+
+# amass binary (pinned release, arch-mapped)
+RUN ARCH="$(dpkg --print-architecture)" &&     wget -qO amass.tar.gz "https://github.com/owasp-amass/amass/releases/download/v5.1.1/amass_linux_${ARCH}.tar.gz" &&     tar -xzf amass.tar.gz && mv amass_linux_${ARCH}/amass /usr/local/bin/ &&     rm -rf amass.tar.gz amass_linux_${ARCH} || true
 
 # Install Python MCP server deps
 WORKDIR /app

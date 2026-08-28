@@ -12,7 +12,9 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql
+      - ./scripts/migrate_explore.sql:/docker-entrypoint-initdb.d/02_migrate_explore.sql
+      - ./scripts/migrate_asm.sql:/docker-entrypoint-initdb.d/03_migrate_asm.sql
 
   redis:
     image: redis:7-alpine
@@ -90,6 +92,44 @@ services:
     volumes:
       - ./reports:/app/reports
 
+
+  sandbox:
+    build:
+      context: ./mcp-servers/sandbox
+      dockerfile: Dockerfile
+    container_name: bughunting_sandbox
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    environment:
+      - RATE_LIMIT_RPS=${RATE_LIMIT_RPS:-5}
+    volumes:
+      - ./targets:/app/targets:ro
+      - sandbox_workspace:/workspace
+
+  asm-mcp:
+    build:
+      context: ./mcp-servers/asm-mcp
+      dockerfile: Dockerfile
+    container_name: bughunting_asm_mcp
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - RATE_LIMIT_RPS=${RATE_LIMIT_RPS:-10}
+      - CENSYS_API_ID=${CENSYS_API_ID}
+      - CENSYS_API_SECRET=${CENSYS_API_SECRET}
+      - FOFA_EMAIL=${FOFA_EMAIL}
+      - FOFA_KEY=${FOFA_KEY}
+      - BINARYEDGE_API_KEY=${BINARYEDGE_API_KEY}
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+    volumes:
+      - ./targets:/app/targets:ro
+      - asm_output:/app/output
+
 volumes:
   postgres_data:
   redis_data:
@@ -97,3 +137,5 @@ volumes:
   recon_output:
   nuclei_output:
   nuclei_templates:
+  sandbox_workspace:
+  asm_output:

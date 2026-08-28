@@ -12,6 +12,7 @@ import {
   Power,
   Zap,
 } from "lucide-react";
+import { apiService } from "@/lib/api";
 
 interface Agent {
   id: string;
@@ -40,12 +41,12 @@ export default function AgentsPage() {
   const [formBaseUrl, setFormBaseUrl] = useState("");
 
   const providers = [
-    { id: "openai", name: "OpenAI", defaultModel: "gpt-4o" },
-    { id: "anthropic", name: "Anthropic", defaultModel: "claude-3-5-sonnet-20241022" },
-    { id: "google", name: "Google", defaultModel: "gemini-3.0-pro" },
-    { id: "mistral", name: "Mistral", defaultModel: "mistral-large-latest" },
-    { id: "groq", name: "Groq", defaultModel: "llama-3.3-70b-versatile" },
-    { id: "deepseek", name: "DeepSeek", defaultModel: "deepseek-chat" },
+    { id: "openai", name: "OpenAI", defaultModel: "gpt-5.6-sol" },
+    { id: "anthropic", name: "Anthropic", defaultModel: "claude-opus-5" },
+    { id: "google", name: "Google", defaultModel: "gemini-3.1-pro-preview" },
+    { id: "mistral", name: "Mistral", defaultModel: "mistral-large-3" },
+    { id: "groq", name: "Groq", defaultModel: "openai/gpt-oss-120b" },
+    { id: "deepseek", name: "DeepSeek", defaultModel: "deepseek-v4-pro" },
     { id: "custom", name: "Custom (OpenAI Compatible)", defaultModel: "" },
   ];
 
@@ -64,11 +65,11 @@ export default function AgentsPage() {
 
   async function loadAgents() {
     try {
-      const res = await fetch("/api/agents");
-      const data = await res.json();
-      if (data.agents) setAgents(data.agents);
+      setLoading(true);
+      const res = await apiService.agents.getAll();
+      if (res.data) setAgents(res.data.agents);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load agents", err);
     } finally {
       setLoading(false);
     }
@@ -78,24 +79,24 @@ export default function AgentsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await fetch("/api/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: formProvider,
-          model: formModel,
-          api_key: formApiKey,
-          role: formRole,
-          nickname: formNickname,
-          base_url: formProvider === "custom" ? formBaseUrl : undefined,
-        }),
+      const res = await apiService.agents.create({
+        provider: formProvider,
+        model: formModel,
+        api_key: formApiKey,
+        role: formRole,
+        nickname: formNickname,
+        base_url: formProvider === "custom" ? formBaseUrl : undefined,
       });
-      setShowModal(false);
-      setFormApiKey("");
-      setFormNickname("");
-      loadAgents();
+      if (res.error) {
+        console.error("Failed to create agent:", res.error);
+      } else {
+        setShowModal(false);
+        setFormApiKey("");
+        setFormNickname("");
+        loadAgents();
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Network error creating agent:", err);
     } finally {
       setSubmitting(false);
     }
@@ -103,26 +104,26 @@ export default function AgentsPage() {
 
   async function toggleStatus(id: string, currentStatus: string) {
     try {
-      await fetch(`/api/agents/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: currentStatus === "active" ? "inactive" : "active",
-        }),
+      const res = await apiService.agents.update(id, {
+        status: currentStatus === "active" ? "inactive" : "active",
       });
-      loadAgents();
+      if (res.error) {
+        console.error("Failed to toggle agent status:", res.error);
+      } else {
+        loadAgents();
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Network error toggling agent status:", err);
     }
   }
 
   async function deleteAgent(id: string) {
     if (!confirm("Remove this AI agent?")) return;
     try {
-      await fetch(`/api/agents/${id}`, { method: "DELETE" });
+      await apiService.agents.delete(id);
       loadAgents();
     } catch (err) {
-      console.error(err);
+      console.error("Failed to delete agent:", err);
     }
   }
 
@@ -130,13 +131,16 @@ export default function AgentsPage() {
     setTestingId(id);
     setTestResult(null);
     try {
-      const res = await fetch(`/api/agents/${id}/test`, { method: "POST" });
-      const data = await res.json();
-      setTestResult({
-        id,
-        success: data.success,
-        msg: data.success ? `Connected! Latency: ${data.latencyMs}ms` : `Error: ${data.error}`,
-      });
+      const res = await apiService.agents.test(id);
+      if (res.data) {
+        setTestResult({
+          id,
+          success: res.data.success,
+          msg: res.data.success ? `Connected! Latency: ${res.data.latencyMs}ms` : `Error: ${res.data.error || 'Unknown error'}`,
+        });
+      } else {
+        setTestResult({ id, success: false, msg: res.error || 'Unknown error' });
+      }
     } catch (err) {
       setTestResult({ id, success: false, msg: "Network error" });
     } finally {
