@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Shield, Zap, BarChart3, Download, Filter, ChevronLeft, ChevronRight, RefreshCw, Search, AlertTriangle, TrendingUp } from "lucide-react";
+import { Target, Shield, Zap, BarChart3, Download, Filter, ChevronLeft, ChevronRight, RefreshCw, Search, AlertTriangle, TrendingUp, X, Globe } from "lucide-react";
 import { Card, PageHeader, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from "@/components/ui";
 
 interface ScoredAsset {
@@ -209,7 +209,7 @@ export default function ASMScoringPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Label>Min Risk Score:</Label>
-            <Select value={String(filters.minRisk)} onValueChange={(v) => setFilters({...filters, minRisk: parseInt(v), page: 0})}>
+            <Select value={String(filters.minRisk)} onValueChange={(v) => { setFilters({...filters, minRisk: parseInt(v)}); setPage(0); }}>
               <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="0">0+ (All)</SelectItem>
@@ -222,7 +222,7 @@ export default function ASMScoringPage() {
           </div>
           <div className="flex items-center gap-2">
             <Label>Tier:</Label>
-            <Select value={filters.tier} onValueChange={(v) => setFilters({...filters, tier: v, page: 0})}>
+            <Select value={filters.tier} onValueChange={(v) => { setFilters({...filters, tier: v}); setPage(0); }}>
               <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tiers</SelectItem>
@@ -400,12 +400,12 @@ export default function ASMScoringPage() {
               {/* Score Breakdown */}
               <div className="grid gap-4 md:grid-cols-3">
                 {[
-                  { label: "Exposure", score: showDetails.exposure_score, color: "#ef4444", icon: Globe },
-                  { label: "Attractiveness", score: showDetails.attractiveness_score, color: "#f59e0b", icon: Zap },
-                  { label: "Exploitability", score: showDetails.exploitability_score, color: "#8b5cf6", icon: Target },
-                ].map(({ label, score, color, icon }) => (
+                  { label: "Exposure", score: showDetails.exposure_score, color: "#ef4444", IconComp: Globe },
+                  { label: "Attractiveness", score: showDetails.attractiveness_score, color: "#f59e0b", IconComp: Zap },
+                  { label: "Exploitability", score: showDetails.exploitability_score, color: "#8b5cf6", IconComp: Target },
+                ].map(({ label, score, color, IconComp }) => (
                   <div key={label} className="p-4 rounded border border-border/50 text-center">
-                    <icon className="mx-auto h-8 w-8 mb-2" style={{ color }} />
+                    <IconComp className="mx-auto h-8 w-8 mb-2" style={{ color }} />
                     <p className="text-xs text-muted-foreground uppercase">{label}</p>
                     <p className="text-4xl font-bold" style={{ color }}>{score.toFixed(1)}</p>
                     <div className="mt-2 h-2 bg-surface-2 rounded overflow-hidden">

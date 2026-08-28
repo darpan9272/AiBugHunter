@@ -168,7 +168,7 @@ export default function ASMGraphPage() {
     
     if (layout === "hierarchical") {
       // Hierarchical: apex at top, then layers
-      const layerMap: Record<string, number> = { apex: 0, host: 1, ip: 2, cert: 2, cname: 2, dns: 2, cert: 2 };
+      const layerMap: Record<string, number> = { apex: 0, host: 1, ip: 2, cert: 2, cname: 2, dns: 2 };
       const layer = layerMap[node.kind] || 1;
       const layerNodes = graph.nodes.filter((n) => (layerMap[n.kind] || 1) === layer);
       const layerIndex = layerNodes.findIndex((n) => n.id === node.id);
@@ -430,7 +430,7 @@ export default function ASMGraphPage() {
                   x={pos.x}
                   y={pos.y - 18}
                   textAnchor="middle"
-                  dominantBaseline="bottom"
+                  dominantBaseline="text-after-edge"
                   fontSize={9}
                   fill="#e2e8f0"
                   stroke="#0f172a"

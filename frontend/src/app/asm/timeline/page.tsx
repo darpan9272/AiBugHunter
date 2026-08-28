@@ -79,8 +79,8 @@ export default function ASMTimelinePage() {
 
       // Extract unique fields and sources for filters
       const allChanges = data.changes;
-      setAvailableFields([...new Set(allChanges.map((c: any) => c.field_name))].sort());
-      setAvailableSources([...new Set(allChanges.map((c: any) => c.source))].sort());
+      setAvailableFields(Array.from(new Set<string>(allChanges.map((c: any) => String(c.field_name)))).sort());
+      setAvailableSources(Array.from(new Set<string>(allChanges.map((c: any) => String(c.source)))).sort());
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -152,11 +152,10 @@ export default function ASMTimelinePage() {
   };
 
   const exportTimeline = () => {
-    const allChanges = assets.flatMap((a) => 
+    const allChanges = assets.flatMap((a) =>
       filteredChanges(a).map((c) => ({
-        asset: a.host,
-        asset_id: a.asset_id,
         ...c,
+        asset: a.host,
       }))
     );
     const csv = [

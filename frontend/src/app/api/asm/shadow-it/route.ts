@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         FROM assets
         WHERE programme_id = $1
           AND (
-            ${inScopePatterns.map((_, i) => `host ILIKE $${i + 2}`).join(' OR ')}
+            ${inScopePatterns.map((_: string, i: number) => `host ILIKE $${i + 2}`).join(' OR ')}
           )
       ),
       candidate_assets AS (
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         LEFT JOIN asset_scores s ON s.asset_id = a.id
         WHERE a.programme_id = $1
           AND NOT (
-            ${inScopePatterns.map((_, i) => `a.host ILIKE $${i + 2}`).join(' OR ')}
+            ${inScopePatterns.map((_: string, i: number) => `a.host ILIKE $${i + 2}`).join(' OR ')}
           )
           AND a.status IS NOT NULL
       )

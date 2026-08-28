@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cloud, Globe, Database, Shield, AlertTriangle, Download, Filter, ChevronLeft, ChevronRight, RefreshCw, Search, ExternalLink, Lock, Unlock } from "lucide-react";
+import { Cloud, Globe, Database, Shield, AlertTriangle, Download, Filter, ChevronLeft, ChevronRight, RefreshCw, Search, ExternalLink, Lock, Unlock, Zap } from "lucide-react";
 import { Card, PageHeader, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from "@/components/ui";
 
 interface CloudAsset {
@@ -225,7 +225,7 @@ export default function ASMCloudPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Label>Provider:</Label>
-            <Select value={filters.provider} onValueChange={(v) => setFilters({...filters, provider: v, page: 0})}>
+            <Select value={filters.provider} onValueChange={(v) => { setFilters({...filters, provider: v}); setPage(0); }}>
               <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Providers</SelectItem>
@@ -242,7 +242,7 @@ export default function ASMCloudPage() {
             <Label>Resource Type:</Label>
             <Input
               value={filters.resourceType}
-              onChange={(e) => setFilters({...filters, resourceType: e.target.value, page: 0})}
+              onChange={(e) => { setFilters({...filters, resourceType: e.target.value}); setPage(0); }}
               placeholder="s3, ec2, storage..."
               className="w-[180px]"
             />
@@ -252,7 +252,7 @@ export default function ASMCloudPage() {
               <input
                 type="checkbox"
                 checked={filters.publicOnly}
-                onChange={(e) => setFilters({...filters, publicOnly: e.target.checked, page: 0})}
+                onChange={(e) => { setFilters({...filters, publicOnly: e.target.checked}); setPage(0); }}
                 className="mr-2 rounded"
               />
               Public Only

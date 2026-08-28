@@ -569,29 +569,30 @@ export default function ASMDashboard() {
   );
 }
 
-function SimpleChart({ data, xKey, yKeys, labels, colors }: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SimpleChart({ data, xKey, yKeys, labels, colors }: {
+  data: any[];
+  xKey: string;
+  yKeys: string[];
+  labels: string[];
+  colors: string[];
+}) {
   if (!data.length) return null;
-  const width = "100%";
+  const width = 600;
   const height = 200;
   const padding = { top: 20, right: 30, bottom: 30, left: 50 };
-  const innerWidth = `calc(${width} - ${padding.left + padding.right}px)`;
+  const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
 
-  const allValues = data.flatMap((d: any) => yKeys.map((k: string) => d[k] || 0));
+  const allValues: number[] = data.flatMap((d) => yKeys.map((k) => Number(d[k]) || 0));
   const maxValue = Math.max(...allValues, 1);
   const minValue = Math.min(...allValues, 0);
 
-  const xScale = (i: number) => padding.left + (i / (data.length - 1 || 1)) * (innerWidth - padding.left);
+  const xScale = (i: number) => padding.left + (i / Math.max(data.length - 1, 1)) * innerWidth;
   const yScale = (v: number) => padding.top + innerHeight - ((v - minValue) / (maxValue - minValue || 1)) * innerHeight;
 
   return (
-    <svg width={width} height={height} className="w-full h-full">
-      <defs>
-        <linearGradient id="grid" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="transparent" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0.05" />
-        </linearGradient>
-      </defs>
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full" preserveAspectRatio="none">
       {/* Grid lines */}
       <g stroke="currentColor" strokeOpacity="0.1" strokeWidth="1">
         {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
@@ -608,17 +609,17 @@ function SimpleChart({ data, xKey, yKeys, labels, colors }: any) {
       </g>
       {/* X axis labels */}
       <g fontSize={10} fill="currentColor" fillOpacity="0.5">
-        {data.map((d: any, i: number) => (
+        {data.map((d, i) => (
           <text key={i} x={xScale(i)} y={height - 8} textAnchor="middle" dominantBaseline="hanging">
-            {d[xKey].slice(5, 10)}
+            {String(d[xKey]).slice(5, 10)}
           </text>
         ))}
       </g>
       {/* Lines */}
-      {yKeys.map((key: string, ki: number) => (
+      {yKeys.map((key, ki) => (
         <path
           key={key}
-          d={data.map((d: any, i: number) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(d[key] || 0)}`).join(" ")}
+          d={data.map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(Number(d[key]) || 0)}`).join(" ")}
           stroke={colors[ki % colors.length]}
           strokeWidth={2}
           fill="none"
@@ -628,7 +629,7 @@ function SimpleChart({ data, xKey, yKeys, labels, colors }: any) {
       ))}
       {/* Legend */}
       <g fontSize={11} fill="currentColor">
-        {labels.map((label: string, i: number) => (
+        {labels.map((label, i) => (
           <g key={label} transform={"translate(" + (padding.left + i * 120) + ", " + (padding.top - 5) + ")"}>
             <line x1={0} y1={0} x2={12} y2={0} stroke={colors[i % colors.length]} strokeWidth={2} />
             <text x={16} y={4}>{label}</text>

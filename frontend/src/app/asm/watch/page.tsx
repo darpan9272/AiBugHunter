@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Bell, BellOff, Edit, Trash2, Play, Pause, Loader2, Globe, Database, FileKey2, BookUser, Search, Zap, Mail, MessageSquare, AlertTriangle, Send, TestTube } from "lucide-react";
+import { Plus, Bell, BellOff, Edit, Trash2, Play, Pause, Loader2, Globe, Database, FileKey2, BookUser, Search, Zap, Mail, MessageSquare, AlertTriangle, Send, TestTube, X } from "lucide-react";
 import { Card, PageHeader, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label } from "@/components/ui";
 
 interface WatchRule {
@@ -39,9 +39,9 @@ const CHANNEL_TYPES = [
   { value: "slack", label: "Slack", icon: MessageSquare },
   { value: "discord", label: "Discord", icon: Zap },
   { value: "pagerduty", label: "PagerDuty", icon: AlertTriangle },
-  { type: "opsgenie", label: "OpsGenie", icon: AlertTriangle },
-  { type: "teams", label: "Microsoft Teams", icon: Send },
-  { type: "webhook", label: "Custom Webhook", icon: TestTube },
+  { value: "opsgenie", label: "OpsGenie", icon: AlertTriangle },
+  { value: "teams", label: "Microsoft Teams", icon: Send },
+  { value: "webhook", label: "Custom Webhook", icon: TestTube },
 ];
 
 export default function ASMWatchPage() {
@@ -202,7 +202,7 @@ export default function ASMWatchPage() {
   };
 
   const getChannelIcon = (type: string) => {
-    const t = CHANNEL_TYPES.find((c) => c.value === type || c.type === type);
+    const t = CHANNEL_TYPES.find((c) => c.value === type);
     return t ? <t.icon className="h-4 w-4" /> : <Bell className="h-4 w-4" />;
   };
 
@@ -458,7 +458,7 @@ export default function ASMWatchPage() {
                 <Select value={newChannel.type} onValueChange={(v) => setNewChannel({...newChannel, type: v, config: {}})}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {CHANNEL_TYPES.map((t) => <SelectItem key={t.value || t.type} value={t.value || t.type}>{t.label}</SelectItem>)}
+                    {CHANNEL_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

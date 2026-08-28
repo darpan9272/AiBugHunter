@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw, Loader2, Play, Pause, CheckCircle, XCircle, AlertCircle, Clock, Database, Zap, Cloud, Globe, Search, Download, ChevronLeft, ChevronRight, Settings, ExternalLink } from "lucide-react";
+import { Plus, RefreshCw, Loader2, Play, Pause, CheckCircle, XCircle, AlertCircle, Clock, Database, Zap, Cloud, Globe, Search, Download, ChevronLeft, ChevronRight, Settings, ExternalLink, X } from "lucide-react";
 import { Card, PageHeader, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Label, Textarea } from "@/components/ui";
 
 interface EnrichmentJob {
