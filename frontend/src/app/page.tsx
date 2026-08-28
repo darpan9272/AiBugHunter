@@ -85,6 +85,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Hydration-safe clock: null during SSR + first client render, real time after mount
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -567,7 +575,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-2 p-2 rounded-lg bg-border/10">
                 <Activity className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs">Last Update: {new Date().toLocaleTimeString()}</span>
+                <span className="text-xs" suppressHydrationWarning>Last Update: {now ? now.toLocaleTimeString() : "—"}</span>
               </div>
             </div>
           </div>
