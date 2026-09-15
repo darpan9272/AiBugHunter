@@ -32,6 +32,14 @@ docker-compose.override.yml
 *.swo
 .mac/
 
+# AI / tool caches
+.claude/
+.ruff_cache/
+*.pyc
+
+# ASM / exploit output
+asm_output/
+
 # Database / Local storage
 *.sqlite3
 *.db

@@ -145,6 +145,14 @@ Use Docker Compose to build and start the backend stack (PostgreSQL on port `543
 docker compose up -d --build
 ```
 
+> 💡 **asm-mcp connects to Postgres via `DATABASE_URL`**. Export it before `up` so the container inherits it:
+>
+> ```bash
+> export DATABASE_URL="postgresql://bugbot:<your-postgres-password>@localhost:5433/bughunting"
+> ```
+>
+> (`<your-postgres-password>` is the value you set for `POSTGRES_PASSWORD` in `.env`.)
+
 This starts:
 - **PostgreSQL** (5433) — with ASM tables (asset_changes, asset_scores, cloud_assets, etc.)
 - **Redis** (6379) — for caching and job queues

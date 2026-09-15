@@ -181,7 +181,7 @@ deploy:
 ### Health Checks
 ```bash
 # Basic health check
-curl http://localhost:3000/api/health
+curl http://localhost:3001/api/health
 
 # Detailed component checks
 python scripts/test_pipeline.py  # Verify all services
@@ -308,7 +308,7 @@ python learning-engine/meta_agent.py
 - [ ] Configure desired API keys (or set to free-only mode)
 - [ ] Test with `scripts/test_pipeline.py`
 - [ ] Verify all containers show healthy status
-- [ ] Test frontend accessibility at http://localhost:3000
+- [ ] Test frontend accessibility at http://localhost:3001
 - [ ] Send test alert to webhook (optional)
 - [ ] Run initial scan on a test target
 

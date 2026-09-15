@@ -238,7 +238,7 @@ async def list_tools() -> list[Tool]:
                     "programme": {"type": "string", "description": "Programme name"},
                     "provider": {"type": "string", "enum": ["aws", "azure", "gcp", "digitalocean", "linode", "vultr", "all"], "default": "all"},
                     "resource_type": {"type": "string", "description": "Filter by resource type (e.g., s3, ec2, storage)"},
-                    "public_only": {"type": "boolean", "default": false, "description": "Only show internet-exposed resources"},
+                    "public_only": {"type": "boolean", "default": False, "description": "Only show internet-exposed resources"},
                     "limit": {"type": "integer", "default": 200},
                 },
                 "required": ["programme"],
@@ -257,7 +257,7 @@ async def list_tools() -> list[Tool]:
                     "programme": {"type": "string", "description": "Programme name"},
                     "issuer": {"type": "string", "description": "Filter by issuer organization"},
                     "expiring_days": {"type": "integer", "description": "Only certs expiring within N days"},
-                    "include_expired": {"type": "boolean", "default": false},
+                    "include_expired": {"type": "boolean", "default": False},
                     "limit": {"type": "integer", "default": 100},
                 },
                 "required": ["domain"],
@@ -997,5 +997,37 @@ async def main():
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
+def _run_http_bridge():
+    """HTTP bridge on :8005 (same pattern as the other MCP servers)."""
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+
+    app = FastAPI(title="asm-mcp")
+
+    @app.get("/tools")
+    async def tools():
+        return await list_tools()
+
+    @app.post("/call")
+    async def call(payload: dict):
+        tool_name = payload.get("name", "")
+        arguments = payload.get("arguments", {}) or {}
+        try:
+            result = await call_tool(tool_name, arguments)
+            text = result[0].text if result else ""
+            return {"ok": True, "result": text}
+        except KeyError as e:
+            return JSONResponse(status_code=400, content={"error": f"Missing argument: {e}"})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    port = int(os.getenv("HTTP_PORT", "8005"))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    if os.getenv("MCP_STDIO") == "1":
+        asyncio.run(main())
+    else:
+        _run_http_bridge()

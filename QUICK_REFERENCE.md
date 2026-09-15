@@ -20,7 +20,7 @@ python scripts/test_free_setup.py
 
 # 5. Start Dashboard
 cd frontend && npm run dev
-# Visit http://localhost:3000
+# Visit http://localhost:3001
 ```
 
 ## 🔑 Environment Variables
