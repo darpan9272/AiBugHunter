@@ -55,8 +55,13 @@ const NAV_ITEMS: NavItem[] = [
 
 const SETTINGS_ITEM: NavItem = { href: "/settings", label: "Settings", icon: Settings };
 
+// Routes that have children listed in the nav — must match exactly.
+const EXACT_MATCH_ROUTES = new Set(["/asm"]);
+
 function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  if (EXACT_MATCH_ROUTES.has(href)) return pathname === href;
+  return pathname.startsWith(href);
 }
 
 function NavLink({
@@ -98,7 +103,7 @@ function Brand({ onNavigate }: { onNavigate?: () => void }) {
       </span>
       <span className="text-base font-bold tracking-tight">
         AI BUG HUNT
-        <span className="text-xs font-normal block">by Derpan Raiyani</span>
+        <span className="text-xs font-normal block">by Darpan Raiyani</span>
       </span>
     </Link>
   );

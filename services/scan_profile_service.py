@@ -136,7 +136,6 @@ class ScanProfileService:
                 del self.profiles[name]
                 return True
             return False
-            return False
         except Exception as e:
             print(f"Error removing profile {name}: {e}")
             return False

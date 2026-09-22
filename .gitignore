@@ -57,3 +57,11 @@ yarn-debug.log*
 yarn-error.log*
 *.bak
 *.backup
+
+# Security — never commit these
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+service-account*.json

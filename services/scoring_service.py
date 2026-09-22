@@ -238,17 +238,17 @@ async def _score_asset(pool: asyncpg.Pool, asset: dict) -> dict:
     # ─────────────────────
     # Composite Risk Score
     # ─────────────────────
-    risk_score = (
-        exposure_score * WEIGHTS["exposure"] +
-        attractiveness_score * WEIGHTS["attractiveness"] +
-        exploitability_score * WEIGHTS["exploitability"]
-    )
-    
-    # Cap at 100
+    # Cap sub-scores BEFORE computing the weighted composite
     exposure_score = min(exposure_score, 100)
     attractiveness_score = min(attractiveness_score, 100)
     exploitability_score = min(exploitability_score, 100)
-    risk_score = min(risk_score, 100)
+    
+    risk_score = min(
+        exposure_score * WEIGHTS["exposure"] +
+        attractiveness_score * WEIGHTS["attractiveness"] +
+        exploitability_score * WEIGHTS["exploitability"],
+        100,
+    )
     
     # Determine tier
     tier = "info"
@@ -305,7 +305,7 @@ def _is_private_ip(ip: str) -> bool:
             return True
         if parts[0] == 169 and parts[1] == 254:
             return True
-    except:
+    except (ValueError, IndexError):
         pass
     return False
 

@@ -139,7 +139,7 @@ class VectorStore:
             ids=[doc_id],
             embeddings=[embedding],
             documents=[text],
-            metadatas={"vuln_type": context.vuln_type, "reason": reason, "report_id": report_id},
+            metadatas=[{"vuln_type": context.vuln_type, "reason": reason, "report_id": report_id}],
         )
         return doc_id
 
@@ -151,7 +151,7 @@ class VectorStore:
             ids=[f"payload_{payload_id}"],
             embeddings=[embedding],
             documents=[text],
-            metadatas={"vuln_type": vuln_type, "payload": payload},
+            metadatas=[{"vuln_type": vuln_type, "payload": payload}],
         )
 
     def find_similar_confirmed(self, context: VulnContext, n: int = 5) -> list[dict]:

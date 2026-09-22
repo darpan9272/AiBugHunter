@@ -1,0 +1,22 @@
+# Root-level Python dependencies
+# Install: pip install -r requirements.txt
+
+# Database
+psycopg2-binary>=2.9
+asyncpg>=0.29
+
+# HTTP client
+httpx>=0.27
+
+# Vector Store
+chromadb>=0.5
+
+# AI Providers
+anthropic>=0.40
+google-generativeai>=0.8
+
+# Config
+pyyaml>=6
+
+# MCP
+mcp>=1.0

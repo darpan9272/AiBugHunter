@@ -317,31 +317,32 @@ async def worker_loop():
                 await update_job_status(pool, job["id"], "failed", error=str(e))
                 print(f"Job {job['id']} failed: {e}")
     
-    while _running:
-        try:
-            # Claim and process jobs
-            jobs_to_process = []
-            for _ in range(MAX_CONCURRENT_JOBS):
-                job = await claim_next_job(pool)
-                if job:
-                    jobs_to_process.append(job)
-                else:
-                    break
-            
-            if jobs_to_process:
-                await asyncio.gather(*[process_with_semaphore(job) for job in jobs_to_process])
-            else:
-                # No jobs, wait before polling again
-                await asyncio.sleep(POLL_INTERVAL)
+    try:
+        while _running:
+            try:
+                # Claim and process jobs
+                jobs_to_process = []
+                for _ in range(MAX_CONCURRENT_JOBS):
+                    job = await claim_next_job(pool)
+                    if job:
+                        jobs_to_process.append(job)
+                    else:
+                        break
                 
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"Worker error: {e}")
-            await asyncio.sleep(5)
-    
-    await pool.close()
-    print("Enrichment worker stopped")
+                if jobs_to_process:
+                    await asyncio.gather(*[process_with_semaphore(job) for job in jobs_to_process])
+                else:
+                    # No jobs, wait before polling again
+                    await asyncio.sleep(POLL_INTERVAL)
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"Worker error: {e}")
+                await asyncio.sleep(5)
+    finally:
+        await pool.close()
+        print("Enrichment worker stopped")
 
 
 def handle_signal(signum, frame):

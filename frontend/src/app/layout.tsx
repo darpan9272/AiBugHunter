@@ -11,9 +11,9 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "AI Bug Hunt — Autonomous Security Console",
-  description: "Autonomous, multi-agent bug bounty reconnaissance and triage. Developed by Derpan Raiyani",
+  description: "Autonomous, multi-agent bug bounty reconnaissance and triage. Developed by Darpan Raiyani",
   other: {
-    developer: "Derpan Raiyani",
+    developer: "Darpan Raiyani",
     "developer:title": "Full-stack Developer & Cybersecurity Specialist",
     "developer:website": "https://darpanraiyani.co.uk",
     "developer:email": "kashtbhanjaninfotech@gmail.com",

@@ -16,12 +16,13 @@ import psycopg2.extras
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://bugbot:changeme_in_prod@localhost:5432/bughunting"
+    "postgresql://bugbot:changeme_in_prod@localhost:5433/bughunting"
 )
 
 
 def _get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    """Get a database connection. Callers must close it (use as context manager)."""
+    return psycopg2.connect(DATABASE_URL, connect_timeout=10)
 
 
 def log_outcome(
